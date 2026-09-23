@@ -130,7 +130,7 @@ def main(argv=None):
         waited_h = (now.timestamp() - UPDATE_FLAG.stat().st_mtime) / 3600
         return in_window(now.time(), config["display"]["dim_from"], config["display"]["dim_to"])             or waited_h > UPDATE_MAX_WAIT_H
 
-    last_update_check = 0
+    last_update_check = -60_000       # check straight away, then every 30 s
     running = True
     while running:
         for event in pygame.event.get():
