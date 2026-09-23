@@ -85,3 +85,5 @@ Set it up once with `bash ~/clock/pi/enable-updates.sh REPO_URL` on the Pi. Afte
 publishing a change is a `git push`. `deploy` still works for pushing straight to the Pi
 without going through GitHub, but the next update check will replace whatever it copied.
 The source mockup PNGs (`retface*.png`) are not committed; only the prepared backgrounds are.
+
+Repository: https://github.com/bs40/Clockadoodledoo (private). Publish a change with `git push`; the Pi picks it up within 5 minutes.
