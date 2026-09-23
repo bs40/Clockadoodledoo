@@ -28,6 +28,8 @@ Tap, click or Space switches to the next face. Esc or Q quits.
   and seconds are split-flap cards that flip when they change; a satellite laps the globe once a
   minute (far right on :00) and passes behind it; the cross-hair markers pulse. Panel, globe and
   orbit positions are constants at the top of `clock/faces/orbit.py`, in `retface2.png` pixels.
+- `saturn` - poster artwork from `retface3.png`, prepared by `toolsprep_saturn.py`. Twinkling stars,
+  blinking colon and an occasional meteor across the sky.
 
 `tools\poster.py` holds the shared paint-out and letterbox steps the prep scripts use.
 
