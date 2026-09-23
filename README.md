@@ -28,8 +28,10 @@ Tap, click or Space switches to the next face. Esc or Q quits.
   and seconds are split-flap cards that flip when they change; a satellite laps the globe once a
   minute (far right on :00) and passes behind it; the cross-hair markers pulse. Panel, globe and
   orbit positions are constants at the top of `clock/faces/orbit.py`, in `retface2.png` pixels.
-- `saturn` - poster artwork from `retface3.png`, prepared by `toolsprep_saturn.py`. Twinkling stars,
+- `saturn` - poster artwork from `retface3.png`, prepared by `tools\prep_saturn.py`. Twinkling stars,
   blinking colon and an occasional meteor across the sky.
+- `pixel` - pixel-art city from `pixface1.png`, prepared by `tools\prep_pixel.py`. Rain falls over
+  the city, the neon sign and lantern flicker, the pixel weather icon animates, the colon blinks.
 
 `tools\poster.py` holds the shared paint-out and letterbox steps the prep scripts use.
 
@@ -41,8 +43,8 @@ Tap, click or Space switches to the next face. Esc or Q quits.
 - `clock/weather.py` - Open-Meteo current conditions + sunrise/sunset, refreshed every 15 min
 - `clock/astro.py` - moon phase
 - `clock/ui.py`, `clock/icons.py` - palette, fonts, tracked text, vector icons
-- `assets/fonts/` - Michroma, Barlow Condensed, Anton and Russo One (SIL OFL, licences alongside)
-- `assets/sounds/` - chime files (not used yet)
+- `assets/fonts/` - Michroma, Barlow Condensed, Anton, Russo One, Press Start 2P and Silkscreen (SIL OFL, licences alongside)
+- `assets/sounds/` - chime files (see Chimes below)
 
 Faces draw at a fixed 1600x720; the app scales that to whatever window or screen it gets.
 
@@ -86,6 +88,6 @@ is open. `config.json` is untracked, so settings survive updates.
 Set it up once with `bash ~/clock/pi/enable-updates.sh REPO_URL` on the Pi. After that,
 publishing a change is a `git push`. `deploy` still works for pushing straight to the Pi
 without going through GitHub, but the next update check will replace whatever it copied.
-The source mockup PNGs (`retface*.png`) are not committed; only the prepared backgrounds are.
+The source mockup PNGs (`retface*.png`, `pixface*.png`) are not committed; only the prepared backgrounds are.
 
 Repository: https://github.com/bs40/Clockadoodledoo (private). Publish a change with `git push`; the Pi picks it up within 5 minutes.

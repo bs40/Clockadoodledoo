@@ -4,3 +4,4 @@ __pycache__/
 config.json
 .update-pending
 retface*.png
+pixface*.png

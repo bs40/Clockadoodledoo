@@ -126,13 +126,14 @@ class SaturnFace:
         travel = 260
         hx, hy = x0 + dx * travel * k, y0 + dy * travel * k
         fade = math.sin(math.pi * k)
-        for i in range(METEOR_LEN):
-            f = 1 - i / METEOR_LEN
-            px, py = hx - dx * i, hy - dy * i
-            if SKY.collidepoint(px, py):
-                sky = self.art.get_at((int(px), int(py)))
-                c = tuple(max(0, min(255, int(sky[i] + (PAPER[i] - sky[i]) * f * f * fade))) for i in range(3))
-                surf.set_at((int(px), int(py)), c)
+        step = 6
+        for i in range(0, METEOR_LEN, step):          # short segments, brightest at the head
+            f = (1 - i / METEOR_LEN) ** 2 * fade
+            a, b = (hx - dx * i, hy - dy * i), (hx - dx * (i + step), hy - dy * (i + step))
+            if SKY.collidepoint(a) and SKY.collidepoint(b):
+                sky = self.art.get_at((int(a[0]), int(a[1])))
+                c = tuple(max(0, min(255, int(sky[j] + (PAPER[j] - sky[j]) * f))) for j in range(3))
+                pygame.draw.line(surf, c, a, b, 2 if i < METEOR_LEN // 3 else 1)
 
     def draw(self, surf, now):
         key = (now.strftime("%Y%m%d%H%M"), self.ctx.weather.version)
