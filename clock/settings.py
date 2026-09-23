@@ -108,8 +108,12 @@ class Settings:
         self.on_face(self.ctx.config["face"])
 
     def save(self):
-        self.ctx.config.clear()
-        self.ctx.config.update(self.draft)
+        for key, value in self.draft.items():          # update in place: other modules hold these dicts
+            if isinstance(value, dict) and isinstance(self.ctx.config.get(key), dict):
+                self.ctx.config[key].clear()
+                self.ctx.config[key].update(value)
+            else:
+                self.ctx.config[key] = value
         with open(self.ctx.config_path, "w", encoding="utf-8") as fh:
             json.dump(self.ctx.config, fh, indent=2)
         self.visible = False

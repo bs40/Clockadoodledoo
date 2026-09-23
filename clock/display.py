@@ -14,10 +14,14 @@ from .schedule import in_window
 
 class Backlight:
     def __init__(self, config):
-        self.cfg = config["display"]
+        self.config = config
         self.current = None       # brightness last applied, 0-100
         self.hardware = None      # True once ddcutil has worked, False once it has failed
         self.overlay = None
+
+    @property
+    def cfg(self):
+        return self.config["display"]
 
     def target(self, now):
         night = in_window(now.time(), self.cfg["dim_from"], self.cfg["dim_to"])

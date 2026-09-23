@@ -16,7 +16,7 @@ def available():
 
 class Chimes:
     def __init__(self, config):
-        self.cfg = config["chime"]
+        self.config = config
         self.sound = None
         self.last_slot = None
         if not pygame.mixer.get_init():
@@ -26,6 +26,10 @@ class Chimes:
                 print(f"chimes: no audio: {exc}")
                 return
         self.apply()
+
+    @property
+    def cfg(self):
+        return self.config["chime"]
 
     def apply(self):
         """Pick up the current config: sound and volume."""
