@@ -17,7 +17,7 @@ grep -q "^github.com" ~/.ssh/known_hosts 2>/dev/null || ssh-keyscan -t ed25519 g
 git remote remove origin 2>/dev/null || true
 git remote add origin "$REPO"
 git fetch -q origin
-git checkout -q -B main origin/main
+git checkout -q -f -B main origin/main   # -f: replace the files deploy.cmd copied here
 cp requirements.txt .venv/requirements.installed 2>/dev/null || true
 echo "checked out $(git log -1 --format='%h %s')"
 
