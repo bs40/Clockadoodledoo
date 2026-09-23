@@ -1,0 +1,29 @@
+{
+  "face": "orrery",
+  "fps": 30,
+  "clock": {
+    "24_hour": true
+  },
+  "chime": {
+    "sound": "grandfather",
+    "enabled": true,
+    "half_hour": false,
+    "volume": 0.8,
+    "quiet_from": "22:00",
+    "quiet_to": "07:00"
+  },
+  "display": {
+    "day": 100,
+    "night": 20,
+    "dim_from": "22:00",
+    "dim_to": "07:00"
+  },
+  "location": {
+    "latitude": 51.43,
+    "longitude": -2.73
+  },
+  "units": {
+    "temperature": "celsius",
+    "wind": "mph"
+  }
+}

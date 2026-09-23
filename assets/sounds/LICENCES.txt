@@ -1,0 +1,20 @@
+All sounds here are CC0 (public domain, no attribution required).
+
+grandfather.wav, grandfather-double.wav
+    Cut from "Grandfather clock, half hour" (s1568) and "Grandfather clock, hour #1" (s1569)
+    by Joseph SARDIN, BigSoundBank.com - https://bigsoundbank.com/  (CC0)
+
+scifi-beep.ogg, scifi-blip.ogg, retro-beep.ogg, retro-beep-2.ogg, retro-alert.ogg,
+terminal.ogg, terminal-2.ogg
+    From "50 CC0 Sci-Fi SFX" by rubberduck, OpenGameArt.org
+    https://opengameart.org/content/50-cc0-sci-fi-sfx  (CC0)
+
+computer-chatter.ogg
+    From "Sci-fi Sounds" by Kenney - https://kenney.nl/assets/sci-fi-sounds  (CC0)
+
+ping.wav, beep-modern.wav, alarm-beep.wav
+    Synthesised for this project (tools/make_sounds.py records how).
+
+alarm-clock.oga
+    "alarm-clock-elapsed" from the freedesktop sound theme (sound-theme-freedesktop),
+    CC BY 3.0 - https://freedesktop.org/wiki/Specifications/sound-theme-spec/
