@@ -1,4 +1,4 @@
-"""Orrery face: time and weather on the left, a toy solar system in the middle.
+"""Orrery face: time and weather beside (landscape) or above (portrait) a toy solar system.
 
 Earth laps the sun once a minute, starting from the top, so it doubles as a
 seconds hand. The other planets keep their real orbital periods relative to it.
@@ -12,12 +12,7 @@ import pygame
 
 from .. import astro, icons, ui
 
-W, H = 1600, 720
 SS = 2  # oversampling for the static artwork
-
-CENTRE = (930, 300)
-FLATTEN = 0.62
-LEFT = 110
 
 # name, orbit radius (px), period (years), disc radius (px), colour
 PLANETS = (
@@ -29,11 +24,24 @@ PLANETS = (
     ("SATURN", 360, 29.46, 15, (205, 184, 146)),
 )
 
-# Areas kept free of stars so text stays clean: readouts, legend, slogans.
-QUIET_ZONES = (pygame.Rect(90, 50, 490, 570), pygame.Rect(1370, 80, 180, 310),
-               pygame.Rect(990, 580, 560, 90))
+SLOGAN = "A SMALL PART OF A BIG UNIVERSE"
 
-SLOGAN ="A SMALL PART OF A BIG UNIVERSE"
+LAYOUTS = {
+    "landscape": dict(
+        size=(1600, 720), centre=(930, 300), flatten=0.62, orbit_scale=1.0, reach=400, stars=420,
+        quiet=(pygame.Rect(90, 50, 490, 570), pygame.Rect(1370, 80, 180, 310), pygame.Rect(990, 580, 560, 90)),
+        legend=[(1392, 100 + i * 52) for i in range(6)],
+        time=(104, 52, 112), date=(110, 196), rule=(110, 268, 550), rows=(110, 318, 64),
+        greeting=(1530, 600, "midright"), slogan=(1530, 648, "midright"),
+    ),
+    "portrait": dict(
+        size=(720, 1600), centre=(360, 640), flatten=0.72, orbit_scale=0.8, reach=310, stars=360,
+        quiet=(pygame.Rect(40, 40, 640, 260), pygame.Rect(40, 900, 640, 660)),
+        legend=[(96 + (i % 3) * 200, 940 + (i // 3) * 46) for i in range(6)],
+        time=(50, 60, 128), date=(58, 210), rule=(58, 280, 662), rows=(58, 1080, 62),
+        greeting=(360, 1500, "center"), slogan=(360, 1546, "center"),
+    ),
+}
 
 
 def _greeting(hour):
@@ -50,10 +58,12 @@ def _greeting(hour):
 
 class OrreryFace:
     name = "orrery"
-    size = (W, H)
+    sizes = {name: layout["size"] for name, layout in LAYOUTS.items()}
 
     def __init__(self, ctx):
         self.ctx = ctx
+        self.L = LAYOUTS[ctx.orientation]
+        self.W, self.H = self.L["size"]
         self.art = self._render_art()
         self.sprites = {p[0]: self._planet_sprite(p) for p in PLANETS}
         self.static = None
@@ -61,24 +71,26 @@ class OrreryFace:
 
     # ---- static artwork, rendered once ---------------------------------
     def _render_art(self):
+        L, W, H = self.L, self.W, self.H
         big = pygame.Surface((W * SS, H * SS))
         big.fill(ui.INK)
         rng = random.Random(1961)
-        for _ in range(420):
+        for _ in range(L["stars"]):
             x, y = rng.randrange(W * SS), rng.randrange(H * SS)
-            if any(r.collidepoint(x // SS, y // SS) for r in QUIET_ZONES):
+            if any(r.collidepoint(x // SS, y // SS) for r in L["quiet"]):
                 continue
             v = rng.choice((70, 95, 120, 170, 230))
             pygame.draw.circle(big, (v, v, int(v * 0.95)), (x, y), rng.choice((1, 1, 2, 2, 3)))
 
-        cx, cy = CENTRE[0] * SS, CENTRE[1] * SS
-        reach_x, reach_y = 400 * SS, int(400 * FLATTEN) * SS
+        cx, cy = L["centre"][0] * SS, L["centre"][1] * SS
+        flatten, k = L["flatten"], L["orbit_scale"]
+        reach_x, reach_y = L["reach"] * SS, int(L["reach"] * flatten) * SS
         pygame.draw.line(big, ui.LINE, (cx - reach_x, cy), (cx + reach_x, cy), SS)
         pygame.draw.line(big, ui.LINE, (cx, cy - reach_y), (cx, cy + reach_y), SS)
         for i in range(-8, 9):
             pygame.draw.line(big, ui.LINE, (cx + i * 50 * SS, cy - 5 * SS), (cx + i * 50 * SS, cy + 5 * SS), SS)
         for _, radius, *_ in PLANETS:
-            rect = pygame.Rect(0, 0, radius * 2 * SS, int(radius * 2 * FLATTEN) * SS)
+            rect = pygame.Rect(0, 0, int(radius * k * 2) * SS, int(radius * k * 2 * flatten) * SS)
             rect.center = (cx, cy)
             pygame.draw.ellipse(big, (70, 100, 112), rect, SS + 1)
 
@@ -104,13 +116,13 @@ class OrreryFace:
             for y in range(0, H, 256):
                 art.blit(tile, (x, y))
 
-        for i, (name, *_rest, colour) in enumerate(PLANETS):
-            y = 100 + i * 52
+        for (name, *_rest, colour), (x, y) in zip(PLANETS, L["legend"]):
             earth = name == "EARTH"
-            pygame.draw.circle(art, ui.AMBER if earth else colour, (1392, y), 9 if earth else 7)
+            pygame.draw.circle(art, ui.AMBER if earth else colour, (x, y), 9 if earth else 7)
             ui.blit_text(art, name, ui.LABEL_MED if earth else ui.LABEL, 26,
-                         ui.CREAM if earth else ui.MUTED, (1418, y), tracking=4, anchor="midleft")
-        ui.blit_text(art, SLOGAN, ui.LABEL, 28, ui.CREAM, (1530, 648), tracking=7, anchor="midright")
+                         ui.CREAM if earth else ui.MUTED, (x + 26, y), tracking=4, anchor="midleft")
+        sx, sy, anchor = L["slogan"]
+        ui.blit_text(art, SLOGAN, ui.LABEL, 28, ui.CREAM, (sx, sy), tracking=7, anchor=anchor)
         return art
 
     def _planet_sprite(self, planet):
@@ -151,22 +163,25 @@ class OrreryFace:
         return rows
 
     def _render_static(self, now):
+        L = self.L
         surf = self.art.copy()
         if self.ctx.config["clock"]["24_hour"]:
             clock = now.strftime("%H:%M")
         else:
             clock = now.strftime("%I:%M").lstrip("0")
-        surf.blit(ui.fixed_digits(clock, ui.WIDE, 112, ui.CREAM)[0], (LEFT - 6, 52))
-        ui.blit_text(surf, now.strftime("%a %d %b %Y").upper(), ui.LABEL_MED, 44, ui.CREAM,
-                     (LEFT, 196), tracking=6)
-        pygame.draw.line(surf, ui.MUTED, (LEFT, 268), (LEFT + 440, 268), 1)
+        tx, ty, tsize = L["time"]
+        surf.blit(ui.fixed_digits(clock, ui.WIDE, tsize, ui.CREAM)[0], (tx, ty))
+        ui.blit_text(surf, now.strftime("%a %d %b %Y").upper(), ui.LABEL_MED, 44, ui.CREAM, L["date"], tracking=6)
+        rx, ry, rx1 = L["rule"]
+        pygame.draw.line(surf, ui.MUTED, (rx, ry), (rx1, ry), 1)
+        left, top, step = L["rows"]
         for i, (icon, value, label) in enumerate(self._rows(now)):
-            y = 318 + i * 64
-            surf.blit(icon, icon.get_rect(center=(LEFT + 22, y)))
-            ui.blit_text(surf, value, ui.LABEL_MED, 40, ui.CREAM, (LEFT + 72, y), anchor="midleft")
-            ui.blit_text(surf, label, ui.LABEL, 25, ui.MUTED, (LEFT + 258, y + 2), tracking=4, anchor="midleft")
-        ui.blit_text(surf, _greeting(now.hour), ui.LABEL, 28, ui.CREAM, (1530, 600),
-                     tracking=7, anchor="midright")
+            y = top + i * step
+            surf.blit(icon, icon.get_rect(center=(left + 22, y)))
+            ui.blit_text(surf, value, ui.LABEL_MED, 40, ui.CREAM, (left + 72, y), anchor="midleft")
+            ui.blit_text(surf, label, ui.LABEL, 25, ui.MUTED, (left + 258, y + 2), tracking=4, anchor="midleft")
+        gx, gy, anchor = L["greeting"]
+        ui.blit_text(surf, _greeting(now.hour), ui.LABEL, 28, ui.CREAM, (gx, gy), tracking=7, anchor=anchor)
         return surf
 
     # ---- per frame -------------------------------------------------------
@@ -177,10 +192,11 @@ class OrreryFace:
             self.static_key = key
         surf.blit(self.static, (0, 0))
 
+        L = self.L
         minutes = now.timestamp() / 60
         for name, radius, period, _, _ in PLANETS:
             a = -math.pi / 2 + 2 * math.pi * (minutes / period % 1.0)
-            x = CENTRE[0] + radius * math.cos(a)
-            y = CENTRE[1] + radius * FLATTEN * math.sin(a)
+            x = L["centre"][0] + radius * L["orbit_scale"] * math.cos(a)
+            y = L["centre"][1] + radius * L["orbit_scale"] * L["flatten"] * math.sin(a)
             sprite = self.sprites[name]
             surf.blit(sprite, sprite.get_rect(center=(round(x), round(y))))

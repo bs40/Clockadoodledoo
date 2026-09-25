@@ -1,7 +1,8 @@
 """Touch settings panel, opened by press-and-hold.
 
 Edits a draft copy of the config; Save writes config.json and applies the changes, Cancel
-throws the draft away. The face carries on animating behind the panel.
+throws the draft away. The face carries on animating behind the panel. The panel lays itself
+out in two columns on a landscape canvas and one column on a portrait one.
 """
 import copy
 import json
@@ -12,13 +13,10 @@ from . import ui
 from .chimes import available
 from .schedule import step_hhmm
 
-PANEL = pygame.Rect(110, 50, 1380, 620)
-COLS = (150, 830)              # left edge of each column
-ROW0, ROW_H = 172, 66
 BTN_W, BTN_H = 62, 54          # the < > buttons
-CTRL_X = 290                   # controls start this far into a column
 VALUE_W = 226
-COL_TITLES = ("CHIME", "DISPLAY")
+SECTIONS = ("CLOCK & CHIME", "DISPLAY")
+ORIENTATIONS = ("landscape", "portrait", "portrait-flipped")
 
 BG = (9, 19, 27)
 BORDER = (122, 214, 228)
@@ -33,6 +31,18 @@ def _pct(v):
     return f"{round(v * 100)}%"
 
 
+def _layout(size):
+    """Panel geometry for a canvas of this size."""
+    w, h = size
+    if w >= h:                                          # landscape: two columns side by side
+        return dict(panel=pygame.Rect(110, 50, w - 220, h - 100), cols=(150, 830), col_w=620,
+                    row0=172, row_h=66, ctrl_x=290, stacked=False,
+                    buttons=((w // 2 - 340, 200), (w // 2 - 100, 200), (w - 370, 200)))
+    return dict(panel=pygame.Rect(24, 40, w - 48, 1090), cols=(56, 56), col_w=w - 112,
+                row0=176, row_h=62, ctrl_x=250, stacked=True,
+                buttons=((36, 200), (260, 200), (484, 200)))
+
+
 class Settings:
     def __init__(self, ctx, faces, on_save, on_face, on_exit):
         self.ctx = ctx
@@ -44,9 +54,10 @@ class Settings:
         self.draft = None
         self.buttons = []          # (rect, callback) rebuilt every draw
         self.flash = None          # (rect, until_ms) button feedback
+        self.layout = None
         self.rows = self._rows()
 
-    # ---- the rows, as (column, label, read, change) -----------------------------
+    # ---- the rows, as (section, label, read, change) -----------------------------
     def _rows(self):
         d = lambda: self.draft
 
@@ -83,18 +94,26 @@ class Settings:
         def clock_change(k):
             d()["clock"]["24_hour"] = not d()["clock"]["24_hour"]
 
+        def orientation():
+            return d()["display"].get("orientation", "landscape").replace("-", " ").upper()
+
+        def orientation_change(k):
+            cur = d()["display"].get("orientation", "landscape")
+            d()["display"]["orientation"] = ORIENTATIONS[(ORIENTATIONS.index(cur) + k) % len(ORIENTATIONS)]
+
         return [
             (0, "SOUND", *spin_choice("chime", "sound", available)),
             (0, "CHIME", when, change_when),
             (0, "VOLUME", *spin_num("chime", "volume", 0.0, 1.0, 0.1, _pct)),
             (0, "QUIET FROM", *spin_time("chime", "quiet_from")),
             (0, "QUIET UNTIL", *spin_time("chime", "quiet_to")),
+            (0, "CLOCK", lambda: "24 HOUR" if d()["clock"]["24_hour"] else "12 HOUR", clock_change),
             (1, "FACE", lambda: d()["face"].upper(), face_change),
+            (1, "ORIENTATION", orientation, orientation_change),
             (1, "DAY BRIGHTNESS", *spin_num("display", "day", 10, 100, 10, lambda v: f"{v}%")),
             (1, "NIGHT BRIGHTNESS", *spin_num("display", "night", 0, 100, 10, lambda v: f"{v}%")),
             (1, "DIM FROM", *spin_time("display", "dim_from")),
             (1, "DIM UNTIL", *spin_time("display", "dim_to")),
-            (1, "CLOCK", lambda: "24 HOUR" if d()["clock"]["24_hour"] else "12 HOUR", clock_change),
         ]
 
     # ---- open / close ------------------------------------------------------------
@@ -126,7 +145,7 @@ class Settings:
                 self.flash = (rect, pygame.time.get_ticks() + 120)
                 action()
                 return True
-        return PANEL.collidepoint(pos)
+        return bool(self.layout) and self.layout["panel"].collidepoint(pos)
 
     # ---- drawing ------------------------------------------------------------------------
     def _button(self, surf, rect, label, action, size=30, colour=TEXT):
@@ -140,37 +159,44 @@ class Settings:
     def draw(self, surf):
         if not self.visible:
             return
+        L = self.layout = _layout(surf.get_size())
+        panel_rect = L["panel"]
         self.buttons = []
-        panel = pygame.Surface(PANEL.size, pygame.SRCALPHA)
+        panel = pygame.Surface(panel_rect.size, pygame.SRCALPHA)
         panel.fill((*BG, 236))
-        surf.blit(panel, PANEL.topleft)
-        pygame.draw.rect(surf, BORDER, PANEL, 3, border_radius=18)
-        ui.blit_text(surf, "SETTINGS", ui.LABEL_BOLD, 40, TITLE, (PANEL.centerx, PANEL.y + 42),
+        surf.blit(panel, panel_rect.topleft)
+        pygame.draw.rect(surf, BORDER, panel_rect, 3, border_radius=18)
+        ui.blit_text(surf, "SETTINGS", ui.LABEL_BOLD, 40, TITLE, (panel_rect.centerx, panel_rect.y + 42),
                      tracking=10, anchor="center")
-        ui.blit_text(surf, "press and hold the clock to open this panel  -  tap a sound name to hear it",
-                     ui.LABEL, 22, DIM, (PANEL.centerx, PANEL.y + 78), tracking=2, anchor="center")
-        for i, title in enumerate(COL_TITLES):
-            ui.blit_text(surf, title, ui.LABEL_MED, 24, BORDER, (COLS[i], ROW0 - 36), tracking=8)
-            pygame.draw.line(surf, BORDER, (COLS[i], ROW0 - 8), (COLS[i] + 620, ROW0 - 8), 1)
+        hint = "press and hold the clock to open this panel  -  tap a sound name to hear it"
+        if L["stacked"]:
+            hint = "hold the clock to open  -  tap a sound name to hear it"
+        ui.blit_text(surf, hint, ui.LABEL, 22, DIM, (panel_rect.centerx, panel_rect.y + 78), tracking=2, anchor="center")
 
-        counts = [0, 0]
-        for col, label, read, change in self.rows:
-            x = COLS[col]
-            y = ROW0 + counts[col] * ROW_H + ROW_H // 2
-            counts[col] += 1
-            ui.blit_text(surf, label, ui.LABEL_MED, 27, TEXT, (x, y), tracking=2, anchor="midleft")
-            left = pygame.Rect(x + CTRL_X, y - BTN_H // 2, BTN_W, BTN_H)
-            right = pygame.Rect(left.right + VALUE_W, left.y, BTN_W, BTN_H)
-            self._button(surf, left, "<", lambda c=change: c(-1), size=34)
-            self._button(surf, right, ">", lambda c=change: c(1), size=34)
-            value_rect = pygame.Rect(left.right, left.y, VALUE_W, BTN_H)
-            value = ui.text_fit(str(read()), ui.LABEL_BOLD, 22, TITLE, VALUE_W - 12, tracking=2)
-            surf.blit(value, value.get_rect(center=value_rect.center))
-            if label.startswith("SOUND"):
-                self.buttons.append((value_rect, lambda: self.ctx.chimes.preview(self.draft["chime"]["sound"])))
+        y = L["row0"]
+        rows_by_section = [[r for r in self.rows if r[0] == s] for s in range(len(SECTIONS))]
+        for s, title in enumerate(SECTIONS):
+            x = L["cols"][s]
+            top = y if L["stacked"] else L["row0"]
+            ui.blit_text(surf, title, ui.LABEL_MED, 24, BORDER, (x, top - 36), tracking=8)
+            pygame.draw.line(surf, BORDER, (x, top - 8), (x + L["col_w"], top - 8), 1)
+            for i, (_, label, read, change) in enumerate(rows_by_section[s]):
+                cy = top + i * L["row_h"] + L["row_h"] // 2
+                ui.blit_text(surf, label, ui.LABEL_MED, 27, TEXT, (x, cy), tracking=2, anchor="midleft")
+                left = pygame.Rect(x + L["ctrl_x"], cy - BTN_H // 2, BTN_W, BTN_H)
+                right = pygame.Rect(left.right + VALUE_W, left.y, BTN_W, BTN_H)
+                self._button(surf, left, "<", lambda c=change: c(-1), size=34)
+                self._button(surf, right, ">", lambda c=change: c(1), size=34)
+                value_rect = pygame.Rect(left.right, left.y, VALUE_W, BTN_H)
+                value = ui.text_fit(str(read()), ui.LABEL_BOLD, 22, TITLE, VALUE_W - 12, tracking=2)
+                surf.blit(value, value.get_rect(center=value_rect.center))
+                if label == "SOUND":
+                    self.buttons.append((value_rect, lambda: self.ctx.chimes.preview(self.draft["chime"]["sound"])))
+            if L["stacked"]:
+                y = top + len(rows_by_section[s]) * L["row_h"] + 60
 
-        self._button(surf, pygame.Rect(PANEL.centerx - 340, PANEL.bottom - 80, 200, 58), "CANCEL", self.cancel)
-        self._button(surf, pygame.Rect(PANEL.centerx - 100, PANEL.bottom - 80, 200, 58), "SAVE", self.save,
-                     colour=TITLE)
-        self._button(surf, pygame.Rect(PANEL.right - 260, PANEL.bottom - 80, 200, 58), "EXIT CLOCK", self.on_exit,
-                     size=26, colour=(240, 120, 100))
+        (cx, cw), (sx, sw), (ex, ew) = L["buttons"]
+        by = panel_rect.bottom - 80
+        self._button(surf, pygame.Rect(cx, by, cw, 58), "CANCEL", self.cancel)
+        self._button(surf, pygame.Rect(sx, by, sw, 58), "SAVE", self.save, colour=TITLE)
+        self._button(surf, pygame.Rect(ex, by, ew, 58), "EXIT CLOCK", self.on_exit, size=26, colour=(240, 120, 100))

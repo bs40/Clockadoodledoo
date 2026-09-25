@@ -13,6 +13,7 @@
     "quiet_to": "07:00"
   },
   "display": {
+    "orientation": "landscape",
     "day": 100,
     "night": 20,
     "dim_from": "22:00",

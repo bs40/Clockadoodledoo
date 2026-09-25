@@ -12,25 +12,37 @@ import pygame
 
 from .. import ui
 
-W, H = 1600, 720
 K = 1600 / 1944
-Y0 = (H - 809 * K) / 2
+Y0 = (720 - 809 * K) / 2
 
 CREAM = (238, 226, 184)
 CYAN = (176, 236, 230)
 PIXEL_BIG = "PressStart2P-Regular"
 PIXEL = "Silkscreen-Regular"
 
-DATE_POS, DATE_CAP = (1410, 92), 36
-TIME_CX, TIME_Y, TIME_CAP, TIME_MAX_W = 1640, 215, 132, 455
-ICON_CENTRE, ICON_CELL = (1500, 395), 9            # icon grid cell size, in retface pixels
-TEMP_POS, TEMP_CAP = (1620, 362), 54
-SUMMARY_POS, SUMMARY_CAP = (1620, 436), 28
-VALUE_X, VALUE_CAP, VALUE_YS = 1665, 28, (573, 632, 688)
-
-CITY = pygame.Rect(20, 40, 1090, 620)             # where rain falls, in background.png pixels
 RAIN_DROPS = 70
-NEON = (pygame.Rect(150, 145, 212, 152), pygame.Rect(378, 205, 95, 205))   # ramen sign, lantern
+
+# Landscape positions are pixface1.png pixels mapped by P(); portrait ones are canvas pixels.
+# Sizes (caps, widths, icon cell) are canvas pixels in both.
+LAYOUTS = {
+    "landscape": dict(
+        size=(1600, 720), image="background.png", scale=K, offset=(0, Y0), panel=None,
+        date=(1410, 92, 30, 400), time=(1640, 215, 109, 375), icon=(1500, 395, 7),
+        temp=(1620, 362, 44, 230), summary=(1620, 436, 23, 240),
+        values=[(None, 1665, y, 23, 200) for y in (573, 632, 688)], divider=None,
+        city=pygame.Rect(20, 40, 1090, 620),
+        neon=(pygame.Rect(150, 145, 212, 152), pygame.Rect(378, 205, 95, 205)),   # ramen sign, lantern
+    ),
+    "portrait": dict(
+        size=(720, 1600), image="portrait.png", scale=1.0, offset=(0, 0), panel=pygame.Rect(24, 830, 672, 746),
+        date=(60, 900, 30, 600), time=(360, 1010, 132, 620), icon=(150, 1180, 8),
+        temp=(270, 1150, 52, 300), summary=(270, 1222, 26, 400),
+        values=[(label, 380, y, 28, 300) for label, y in (("HUMIDITY", 1370), ("WIND", 1440), ("PRESSURE", 1510))],
+        divider=(60, 1300, 660),
+        city=pygame.Rect(0, 0, 720, 809),
+        neon=(pygame.Rect(0, 176, 110, 185), pygame.Rect(129, 216, 115, 249)),
+    ),
+}
 
 # Pixel icons on a 14x12 grid. Letters pick colours; '.' is empty.
 PALETTE = {"c": (206, 232, 230), "d": (160, 196, 200), "b": (110, 200, 236), "y": (250, 214, 96),
@@ -61,11 +73,7 @@ ICONS = {
 ICONS["clear-night"] = ICONS["sun"]
 
 
-def P(x, y):
-    return round(x * K), round(Y0 + y * K)
-
-
-def _icon_surface(name, frame):
+def _icon_surface(name, frame, cell):
     rows = [list(r) for r in ICONS.get(name, ICONS["cloud"])]
     if name in ("rain", "snow"):                  # the drops fall: cycle the lower rows
         lower = rows[7:]
@@ -82,46 +90,69 @@ def _icon_surface(name, frame):
         for x, ch in enumerate(r):
             if ch in PALETTE:
                 surf.set_at((x, y), PALETTE[ch])
-    cell = round(ICON_CELL * K)
     return pygame.transform.scale(surf, (w * cell, h * cell))
 
 
 class PixelFace:
     name = "pixel"
-    size = (W, H)
+    sizes = {name: layout["size"] for name, layout in LAYOUTS.items()}
 
     def __init__(self, ctx):
         self.ctx = ctx
-        path = ui.ASSETS / "faces" / "pixel" / "background.png"
+        self.L = LAYOUTS[ctx.orientation]
+        path = ui.ASSETS / "faces" / "pixel" / self.L["image"]
         self.art = pygame.image.load(str(path)).convert()
+        if self.L["panel"]:
+            self._draw_panel()
         self.static = None
         self.static_key = None
         self.colon = None
         self.icon_name = "cloud"
         self.icons = {}
         rng = random.Random(5)
-        self.rain = [[rng.uniform(CITY.left, CITY.right), rng.uniform(CITY.top, CITY.bottom),
+        CITY = self.L["city"]
+        self.rain = [[rng.uniform(0, CITY.width), rng.uniform(0, CITY.height),
                       rng.uniform(420, 620), rng.randint(10, 22)] for _ in range(RAIN_DROPS)]
         self.rain_layer = pygame.Surface(CITY.size, pygame.SRCALPHA)
         self.last_t = None
         self.rng = random.Random()
         self.flicker = [0.0, 0.0]        # end time of the current flicker for each neon region
-        self.shade = [pygame.Surface(r.size) for r in NEON]
+        self.shade = [pygame.Surface(r.size) for r in self.L["neon"]]
+
+    def P(self, x, y):
+        k, (ox, oy) = self.L["scale"], self.L["offset"]
+        return round(ox + x * k), round(oy + y * k)
+
+    def _draw_panel(self):
+        """Portrait: the dark readout panel, drawn below the street in the poster's style."""
+        art, panel = self.art, self.L["panel"]
+        pygame.draw.rect(art, (7, 7, 9), panel, border_radius=22)
+        rng = random.Random(9)
+        for _ in range(panel.width * panel.height // 40):        # a little pixel grain
+            x, y = rng.randrange(panel.left + 4, panel.right - 4), rng.randrange(panel.top + 4, panel.bottom - 4)
+            v = rng.randint(10, 22)
+            art.set_at((x, y), (v, v, v + 2))
+        pygame.draw.rect(art, (96, 104, 112), panel, 3, border_radius=22)
+        x0, y, x1 = self.L["divider"]
+        pygame.draw.line(art, CYAN, (x0, y), (x1, y), 2)
+        pygame.draw.polygon(art, CYAN, [(x1 - 100, y), (x1 - 92, y - 6), (x1 - 84, y), (x1 - 92, y + 6)])
 
     # ---- text layer -----------------------------------------------------------------
     def _render_static(self, now):
-        surf = self.art.copy()
-        date = ui.text_fit(now.strftime("%a %d %b %Y").upper(), PIXEL, round(DATE_CAP * K), CREAM, 400, tracking=3)
-        surf.blit(date, date.get_rect(midleft=P(*DATE_POS)))
+        L, surf = self.L, self.art.copy()
+        x, y, cap, max_w = L["date"]
+        date = ui.text_fit(now.strftime("%a %d %b %Y").upper(), PIXEL, cap, CREAM, max_w, tracking=3)
+        surf.blit(date, date.get_rect(midleft=self.P(x, y)))
 
         clock = now.strftime("%H:%M") if self.ctx.config["clock"]["24_hour"] else now.strftime("%I:%M").lstrip("0")
-        full, ink, spans = ui.fixed_digits(clock, PIXEL_BIG, ui.size_for_cap(PIXEL_BIG, round(TIME_CAP * K)), CREAM)
-        squeeze = min(TIME_MAX_W * K / ink.width, 1.0)
+        tx, ty, cap, max_w = L["time"]
+        full, ink, spans = ui.fixed_digits(clock, PIXEL_BIG, ui.size_for_cap(PIXEL_BIG, cap), CREAM)
+        squeeze = min(max_w / ink.width, 1.0)
         x, width = spans[clock.index(":")]
         gap = pygame.Rect(round(x * squeeze), 0, round(width * squeeze), full.get_height())
         full = pygame.transform.scale(full, (round(full.get_width() * squeeze), full.get_height()))
         ink = pygame.Rect(0, ink.y, full.get_width(), ink.height)
-        cx, cy = P(TIME_CX, TIME_Y)
+        cx, cy = self.P(tx, ty)
         origin = (cx - ink.centerx, cy - ink.centery)
         self.colon = (full.subsurface(gap).copy(), (origin[0] + gap.x, origin[1]))
         full.fill((0, 0, 0, 0), gap)
@@ -129,20 +160,25 @@ class PixelFace:
 
         w = self.ctx.weather.current
         self.icon_name = w["icon"] if w else "cloud"
-        temp = ui.text_fit(f"{w['temp']}{w['temp_unit']}" if w else "--", PIXEL, round(TEMP_CAP * K), CREAM, 230, tracking=3)
-        surf.blit(temp, temp.get_rect(midleft=P(*TEMP_POS)))
-        summary = ui.text_fit(w["summary"] if w else "NO DATA YET", PIXEL, round(SUMMARY_CAP * K), CREAM, 240, tracking=3)
-        surf.blit(summary, summary.get_rect(midleft=P(*SUMMARY_POS)))
+        x, y, cap, max_w = L["temp"]
+        temp = ui.text_fit(f"{w['temp']}{w['temp_unit']}" if w else "--", PIXEL, cap, CREAM, max_w, tracking=3)
+        surf.blit(temp, temp.get_rect(midleft=self.P(x, y)))
+        x, y, cap, max_w = L["summary"]
+        summary = ui.text_fit(w["summary"] if w else "NO DATA YET", PIXEL, cap, CREAM, max_w, tracking=3)
+        surf.blit(summary, summary.get_rect(midleft=self.P(x, y)))
         values = (f"{w['humidity']}%", f"{w['wind']} {w['wind_unit']} {w['wind_dir']}", f"{w['pressure']} hPa") \
             if w else ("--",) * 3
-        for value, y in zip(values, VALUE_YS):
-            t = ui.text_fit(value, PIXEL, round(VALUE_CAP * K), CYAN, 200, tracking=3)
-            surf.blit(t, t.get_rect(midleft=P(VALUE_X, y)))
+        for value, (label, x, y, cap, max_w) in zip(values, L["values"]):
+            if label:                                     # portrait draws its own labels
+                t = ui.text_fit(label, PIXEL, cap, CYAN, 300, tracking=3)
+                surf.blit(t, t.get_rect(midleft=self.P(60, y)))
+            t = ui.text_fit(value, PIXEL, cap, CYAN, max_w, tracking=3)
+            surf.blit(t, t.get_rect(midleft=self.P(x, y)))
         return surf
 
     # ---- per frame ---------------------------------------------------------------------
     def _draw_rain(self, surf, dt):
-        layer = self.rain_layer
+        CITY, layer = self.L["city"], self.rain_layer
         layer.fill((0, 0, 0, 0))
         for drop in self.rain:
             drop[1] += drop[2] * dt
@@ -154,7 +190,7 @@ class PixelFace:
         surf.blit(layer, CITY.topleft)
 
     def _draw_neon(self, surf, t):
-        for i, rect in enumerate(NEON):
+        for i, rect in enumerate(self.L["neon"]):
             if t > self.flicker[i]:
                 if self.rng.random() < 0.006:       # about one flicker every 5 s at 30 fps
                     self.flicker[i] = t + self.rng.uniform(0.1, 0.45)
@@ -177,8 +213,9 @@ class PixelFace:
         if now.second % 2 == 1:
             surf.blit(*self.colon)
         frame = int(t * 3)
+        ix, iy, cell = self.L["icon"]
         icon_key = (self.icon_name, frame % 6)
         if icon_key not in self.icons:
-            self.icons[icon_key] = _icon_surface(*icon_key)
+            self.icons[icon_key] = _icon_surface(*icon_key, cell)
         icon = self.icons[icon_key]
-        surf.blit(icon, icon.get_rect(center=P(*ICON_CENTRE)))
+        surf.blit(icon, icon.get_rect(center=self.P(ix, iy)))

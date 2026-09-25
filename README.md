@@ -11,8 +11,23 @@ Python + pygame-ce; the same code runs in a window on a PC for development.
 
     .venv\Scripts\python.exe run.py --face cosmonaut                    # start on a particular face
 
+    .venv\Scripts\python.exe run.py --portrait                         # the portrait layouts
+
 Tap, click or Space switches to the next face. Esc or Q quits.
 `--screenshot out.png` renders one frame and exits. On the Pi, add `--fullscreen`.
+
+## Orientation
+
+Every face has a landscape (1600x720) and a portrait (720x1600) layout. The settings panel's
+ORIENTATION row picks LANDSCAPE, PORTRAIT or PORTRAIT FLIPPED; the clock draws the portrait
+canvas and turns it onto the screen itself (touch positions are turned to match), so the
+screen can simply be stood on its end with no operating-system changes. PORTRAIT puts the top
+of the picture at the screen's left edge; if it comes up upside down, choose PORTRAIT FLIPPED.
+In a window on the PC the picture is shown upright; `--rotate` shows it turned as the Pi does.
+
+Portrait backgrounds for the artwork faces are composed from pieces of the mockups by the same
+`tools\prep_*.py` scripts (`assets/faces/<face>/portrait.png`); each face module has a
+`LAYOUTS` table with the positions for both orientations.
 
 ## Faces
 
@@ -37,7 +52,7 @@ Tap, click or Space switches to the next face. Esc or Q quits.
 
 ## Layout
 
-- `config.json` - face, location (for weather), units, 12/24 hour, frame rate
+- `config.json` - face, orientation, location (for weather), units, 12/24 hour, frame rate
 - `clock/app.py` - main loop
 - `clock/faces/` - one module per face; register new ones in `faces/__init__.py`
 - `clock/weather.py` - Open-Meteo current conditions + sunrise/sunset, refreshed every 15 min

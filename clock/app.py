@@ -14,6 +14,10 @@ HOLD_MS = 700          # press-and-hold this long to open settings
 UPDATE_FLAG = ROOT / ".update-pending"   # written by pi/update.sh when new code has been installed
 UPDATE_MAX_WAIT_H = 30                   # restart for an update anyway after this long
 
+# How the drawn picture is turned to land the right way up on the physically-mounted screen.
+# "portrait": the picture's top is at the screen's left edge (screen stood on its left side).
+ROTATION = {"landscape": 0, "portrait": 90, "portrait-flipped": -90}
+
 
 def load_config():
     """config.json holds this clock's settings; anything it lacks comes from config.default.json."""
@@ -35,6 +39,9 @@ def parse_args(argv=None):
     p.add_argument("--face", help="face to show (default: from config.json)")
     p.add_argument("--fullscreen", action="store_true", help="fill the screen (use this on the Pi)")
     p.add_argument("--scale", type=float, default=1.0, help="window scale when not fullscreen, e.g. 0.75")
+    p.add_argument("--portrait", action="store_true", help="use the portrait layouts regardless of config")
+    p.add_argument("--rotate", action="store_true",
+                   help="in a window, show the picture turned as the Pi's screen would (normally only fullscreen does)")
     p.add_argument("--demo", action="store_true", help="use the mockup's weather values, no network")
     p.add_argument("--time", help="pretend it is this time, e.g. 2026-09-23T19:42:17")
     p.add_argument("--screenshot", metavar="PNG", help="render one frame to a file and exit")
@@ -53,10 +60,10 @@ def main(argv=None):
     import pygame
     from .chimes import Chimes, available
     from .display import Backlight
-    from .schedule import in_window
     from .faces import FACES
     from .settings import Settings
     from .weather import Weather
+    from .schedule import in_window
 
     config = load_config()
     if args.chime is not None:
@@ -73,62 +80,101 @@ def main(argv=None):
         return
     pygame.init()
     pygame.display.set_caption("Clockadoodledoo")
-
-    names = list(FACES)
-    current = names.index(args.face or config["face"])
-    fw, fh = FACES[names[current]].size
-    if args.fullscreen:
-        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-        pygame.mouse.set_visible(False)
-    else:
-        screen = pygame.display.set_mode((round(fw * args.scale), round(fh * args.scale)))
+    if args.portrait:
+        config["display"]["orientation"] = "portrait"
 
     weather = Weather(config, demo=args.demo)
     if args.screenshot:
         weather.fetch_once()
     else:
         weather.start()
-    ctx = SimpleNamespace(config=config, config_path=CONFIG, weather=weather)
+    ctx = SimpleNamespace(config=config, config_path=CONFIG, weather=weather, orientation="landscape")
     chimes = ctx.chimes = Chimes(config)
     backlight = Backlight(config)
-    loaded = {}
 
-    def face_at(index):
-        if index not in loaded:
-            loaded[index] = FACES[names[index]](ctx)
-        return loaded[index]
+    # ---- orientation, canvas and faces: rebuilt whenever the orientation changes ---------
+    state = SimpleNamespace(names=[], current=0, loaded={}, canvas=None, rotation=0, fw=0, fh=0)
+    screen = None
+
+    def layout_name():
+        return "portrait" if config["display"].get("orientation", "landscape").startswith("portrait") else "landscape"
+
+    def apply_orientation(start_face=None):
+        nonlocal screen
+        ctx.orientation = layout_name()
+        state.rotation = ROTATION.get(config["display"].get("orientation", "landscape"), 0)
+        state.names = [n for n, f in FACES.items() if ctx.orientation in f.sizes]
+        wanted = start_face or config["face"]
+        state.current = state.names.index(wanted) if wanted in state.names else 0
+        state.loaded = {}
+        state.fw, state.fh = FACES[state.names[state.current]].sizes[ctx.orientation]
+        state.canvas = pygame.Surface((state.fw, state.fh))
+        if screen is None:
+            if args.fullscreen:
+                screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                pygame.mouse.set_visible(False)
+            else:
+                shown_w, shown_h = shown_size()
+                desk_w, desk_h = pygame.display.get_desktop_sizes()[0]
+                k = min(args.scale, 0.92 * desk_w / shown_w, 0.85 * desk_h / shown_h)
+                screen = pygame.display.set_mode((round(shown_w * k), round(shown_h * k)))
+
+    def rotated():
+        return args.fullscreen or args.rotate
+
+    def shown_size():
+        """Size of the picture as it goes to the screen (turned, if the screen is on its side)."""
+        return (state.fh, state.fw) if rotated() and state.rotation else (state.fw, state.fh)
+
+    apply_orientation(args.face)
+
+    def face():
+        if state.current not in state.loaded:
+            state.loaded[state.current] = FACES[state.names[state.current]](ctx)
+        return state.loaded[state.current]
+
+    def next_face():
+        state.current = (state.current + 1) % len(state.names)
 
     def show_face(name):
-        nonlocal current
-        current = names.index(name)
+        if name in state.names:
+            state.current = state.names.index(name)
 
     def settings_saved():
         chimes.apply()
         backlight.reapply()
+        if layout_name() != ctx.orientation or ROTATION.get(config["display"].get("orientation"), 0) != state.rotation:
+            apply_orientation()
         show_face(config["face"])
 
     def quit_app():
         pygame.event.post(pygame.event.Event(pygame.QUIT))
 
-    settings = Settings(ctx, names, on_save=settings_saved, on_face=show_face, on_exit=quit_app)
+    settings = Settings(ctx, list(FACES), on_save=settings_saved, on_face=show_face, on_exit=quit_app)
     if args.settings:
         settings.open()
 
     offset = datetime.fromisoformat(args.time) - datetime.now() if args.time else None
-    canvas = screen if screen.get_size() == (fw, fh) else pygame.Surface((fw, fh))
     ticker = pygame.time.Clock()
     press = None               # (ticks, canvas position) while a finger or button is down
     scale, origin = 1.0, (0, 0)
 
     def to_canvas(pos):
-        return ((pos[0] - origin[0]) / scale, (pos[1] - origin[1]) / scale)
+        """Screen position -> position on the (unturned) canvas."""
+        x, y = (pos[0] - origin[0]) / scale, (pos[1] - origin[1]) / scale
+        if rotated() and state.rotation == 90:        # picture turned anticlockwise onto the screen
+            return state.fw - 1 - y, x
+        if rotated() and state.rotation == -90:
+            return y, state.fh - 1 - x
+        return x, y
 
     def update_due(now):
         """New code is installed: restart during the dim hours, when nobody is looking."""
         if not UPDATE_FLAG.exists() or settings.visible:
             return False
         waited_h = (now.timestamp() - UPDATE_FLAG.stat().st_mtime) / 3600
-        return in_window(now.time(), config["display"]["dim_from"], config["display"]["dim_to"])             or waited_h > UPDATE_MAX_WAIT_H
+        return in_window(now.time(), config["display"]["dim_from"], config["display"]["dim_to"]) \
+            or waited_h > UPDATE_MAX_WAIT_H
 
     last_update_check = -60_000       # check straight away, then every 30 s
     running = True
@@ -144,7 +190,7 @@ def main(argv=None):
                 elif event.key == pygame.K_s:
                     settings.open()
                 elif event.key == pygame.K_SPACE and not settings.visible:
-                    current = (current + 1) % len(names)
+                    next_face()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 press = (pygame.time.get_ticks(), to_canvas(event.pos))
             elif event.type == pygame.MOUSEBUTTONUP and press is not None:
@@ -153,7 +199,7 @@ def main(argv=None):
                 if settings.visible:
                     settings.tap(pos)
                 else:
-                    current = (current + 1) % len(names)      # a short tap: next face
+                    next_face()                                   # a short tap: next face
         if press is not None and not settings.visible and pygame.time.get_ticks() - press[0] >= HOLD_MS:
             press = None
             settings.open()
@@ -170,18 +216,22 @@ def main(argv=None):
                 os.execv(sys.executable, [sys.executable] + sys.argv)
         chimes.tick(now)
         backlight.tick(now)
-        face_at(current).draw(canvas, now)
+        canvas = state.canvas
+        face().draw(canvas, now)
         settings.draw(canvas)
         backlight.draw(canvas)
 
-        if canvas is not screen:
-            sw, sh = screen.get_size()
-            scale = min(sw / fw, sh / fh)
-            scaled = pygame.transform.smoothscale(canvas, (round(fw * scale), round(fh * scale)))
-            rect = scaled.get_rect(center=(sw // 2, sh // 2))
-            origin = rect.topleft
+        picture = pygame.transform.rotate(canvas, state.rotation) if rotated() and state.rotation else canvas
+        sw, sh = screen.get_size()
+        pw, ph = picture.get_size()
+        scale = min(sw / pw, sh / ph)
+        if scale != 1.0:
+            picture = pygame.transform.smoothscale(picture, (round(pw * scale), round(ph * scale)))
+        rect = picture.get_rect(center=(sw // 2, sh // 2))
+        origin = rect.topleft
+        if rect.size != (sw, sh):
             screen.fill((0, 0, 0))
-            screen.blit(scaled, rect)
+        screen.blit(picture, rect)
 
         if args.screenshot:
             pygame.image.save(canvas, args.screenshot)

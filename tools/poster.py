@@ -1,14 +1,16 @@
-"""Shared steps for turning a poster mockup into a face background.
+"""Shared steps for turning a poster mockup into face backgrounds.
 
-A mockup has example readouts baked into it. paint_out() removes them by copying
-nearby clean background over them; prepare() does that for a list of regions and
-then letterboxes the poster to the screen size.
+A mockup has example readouts baked into it. paint_out() removes them by copying nearby clean
+background over them. prepare() does that for a list of regions and letterboxes the poster to
+the landscape screen; compose() cuts pieces out of the cleaned poster and arranges them on a
+portrait canvas.
 """
 import random
 
 import pygame
 
 TARGET = (1600, 720)
+PORTRAIT = (720, 1600)
 GROW = 3  # widen the painted-out area to catch soft edges
 
 
@@ -67,23 +69,45 @@ def paint_out(px, w, h, rect, is_bg, rng):
     return len(filled)
 
 
-def prepare(src, out, regions, matte):
-    """regions: ((x0, y0, x1, y1), is_background(r, g, b)) in source pixels.
-    matte: colour for the letterbox bars, normally the poster's own outer colour."""
-    pygame.init()
-    poster = pygame.image.load(str(src))
+def clean(poster, regions, seed=4):
+    """Return a copy of `poster` with the baked-in readouts in `regions` painted out.
+    regions: ((x0, y0, x1, y1), is_background(r, g, b)) in poster pixels."""
     w, h = poster.get_size()
     px = bytearray(pygame.image.tobytes(poster, "RGB"))
-    rng = random.Random(4)
+    rng = random.Random(seed)
     for rect, is_bg in regions:
         print(f"painted out {paint_out(px, w, h, rect, is_bg, rng)} px in {rect}")
-    cleaned = pygame.image.frombytes(bytes(px), (w, h), "RGB")
+    return pygame.image.frombytes(bytes(px), (w, h), "RGB")
 
-    k = min(TARGET[0] / w, TARGET[1] / h)
+
+def letterbox(cleaned, out, matte, target=TARGET):
+    """Scale the whole poster to fit `target` and save it."""
+    w, h = cleaned.get_size()
+    k = min(target[0] / w, target[1] / h)
     scaled = pygame.transform.smoothscale(cleaned, (round(w * k), round(h * k)))
-    canvas = pygame.Surface(TARGET)
+    canvas = pygame.Surface(target)
     canvas.fill(matte)
-    canvas.blit(scaled, scaled.get_rect(center=(TARGET[0] // 2, TARGET[1] // 2)))
+    canvas.blit(scaled, scaled.get_rect(center=(target[0] // 2, target[1] // 2)))
     out.parent.mkdir(parents=True, exist_ok=True)
     pygame.image.save(canvas, str(out))
     print(f"wrote {out} (scale {k:.4f})")
+
+
+def compose(cleaned, out, pieces, matte, size=PORTRAIT):
+    """Cut `pieces` out of the poster and place them: each is ((sx, sy, sw, sh), (dx, dy, dw, dh))."""
+    canvas = pygame.Surface(size)
+    canvas.fill(matte)
+    for src, dst in pieces:
+        piece = cleaned.subsurface(pygame.Rect(src))
+        canvas.blit(pygame.transform.smoothscale(piece, (dst[2], dst[3])), (dst[0], dst[1]))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    pygame.image.save(canvas, str(out))
+    print(f"wrote {out}")
+
+
+def prepare(src, out, regions, matte):
+    """Landscape background: paint out `regions`, letterbox to the screen. Returns the cleaned poster."""
+    pygame.init()
+    cleaned = clean(pygame.image.load(str(src)), regions)
+    letterbox(cleaned, out, matte)
+    return cleaned

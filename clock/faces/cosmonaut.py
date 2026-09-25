@@ -14,22 +14,11 @@ import pygame
 
 from .. import icons, ui
 
-W, H = 1600, 720
 PAPER = (252, 229, 188)
 POSTER_RED = (233, 70, 36)
 LASH = (14, 18, 28)
 ANTON = "Anton-Regular"
 
-SUN_X = 915            # readouts are centred here, on the red sun
-DATE_Y, DATE_CAP = 161, 36
-TIME_Y, TIME_CAP = 307, 192
-TIME_MAX_W = 520
-
-ICON_X, VALUE_X, VALUE_MAX_W = 1378, 1428, 148
-ROWS_Y = (130, 237, 317, 397)
-
-# Centres of the poster's own sparkle stars (found in background.png), with a size for each.
-SPARKLES = ((618, 91, 34), (53, 97, 24), (676, 565, 36), (738, 453, 22), (1191, 78, 22))
 FAINT_STARS = 28
 
 # Eyelids, in background.png pixels. `top` is the upper edge of the eyeliner, `open` the upper
@@ -51,8 +40,35 @@ BLINK_SHUT, BLINK_HOLD, BLINK_OPEN = 0.09, 0.06, 0.14
 DOUBLE_BLINK_GAP = 0.40
 DOUBLE_BLINK_PERIOD = 300
 
-PLUME = pygame.Rect(1220, 328, 98, 222)   # the smoke columns under the rocket
 PLUME_SUB = 4                             # horizontal sub-pixel steps for the ripple
+
+
+def _portrait_eye(eye):
+    """The portrait background scales the cosmonaut band by 1.12 and shifts it up; map an eye."""
+    def f(p):
+        return (p[0] * 1.1203, (p[1] - 26.7) * 1.1203 - 92.3)
+    return {"top": tuple(map(f, eye["top"])), "open": tuple(map(f, eye["open"])),
+            "shut": tuple(map(f, eye["shut"])), "skin": f(eye["skin"]), "lash": eye["lash"] * 1.12}
+
+
+LAYOUTS = {
+    "landscape": dict(
+        size=(1600, 720), image="background.png",
+        sun_x=915, date=(161, 36, 420), time=(307, 192, 520),
+        # weather column: (icon x, value x, value width) and a y for each of the four rows
+        weather=[(1378, 1428, 148, y) for y in (130, 237, 317, 397)],
+        sparkles=((618, 91, 34), (53, 97, 24), (676, 565, 36), (738, 453, 22), (1191, 78, 22)),
+        plume=pygame.Rect(1220, 328, 98, 222), eyes=EYES, sky=pygame.Rect(20, 40, 1560, 540),
+    ),
+    "portrait": dict(
+        size=(720, 1600), image="portrait.png",
+        sun_x=349, date=(662, 40, 600), time=(846, 236, 620),
+        weather=[(110, 160, 190, 1045), (410, 460, 190, 1045), (110, 160, 190, 1140), (410, 460, 190, 1140)],
+        sparkles=((33, 1203, 36), (116, 1056, 22), (622, 205, 18)),
+        plume=pygame.Rect(284, 1300, 112, 131), eyes=[_portrait_eye(e) for e in EYES],
+        sky=pygame.Rect(20, 20, 680, 1270),
+    ),
+}
 
 
 def _sparkle(size):
@@ -131,11 +147,13 @@ def _closure(age):
 
 class CosmonautFace:
     name = "cosmonaut"
-    size = (W, H)
+    sizes = {name: layout["size"] for name, layout in LAYOUTS.items()}
 
     def __init__(self, ctx):
         self.ctx = ctx
-        path = ui.ASSETS / "faces" / "cosmonaut" / "background.png"
+        self.L = LAYOUTS[ctx.orientation]
+        self.PLUME = self.L["plume"]
+        path = ui.ASSETS / "faces" / "cosmonaut" / self.L["image"]
         self.art = pygame.image.load(str(path)).convert()
         self.static = None
         self.static_key = None
@@ -143,10 +161,10 @@ class CosmonautFace:
 
         rng = random.Random(7)
         self.sparkles = [(x, y, _sparkle(int(size * 1.7)), rng.uniform(9, 16), rng.uniform(0, 1))
-                         for x, y, size in SPARKLES]
+                         for x, y, size in self.L["sparkles"]]
         self.faint = self._faint_stars(rng)
 
-        self.eyes = [_blink_frames(self.art, eye) for eye in EYES]
+        self.eyes = [_blink_frames(self.art, eye) for eye in self.L["eyes"]]
         self.blinks = []          # start times of blinks in progress or queued
         self.next_blink = None
         self.last_mark = None
@@ -158,6 +176,7 @@ class CosmonautFace:
         """Lift the smoke out of the PLUME patch so it can move without dragging the sun's edge
         or the skyline with it. Returns (patch with the smoke painted out, smoke on transparent),
         both stretched PLUME_SUB times wider so rows can shift by fractions of a pixel."""
+        PLUME = self.PLUME
         sky = self.art.subsurface(PLUME).copy()
         smoke = pygame.Surface(PLUME.size, pygame.SRCALPHA)
         night = _average_colour(self.art, (PLUME.right - 8, PLUME.top + 40))
@@ -173,9 +192,11 @@ class CosmonautFace:
     def _faint_stars(self, rng):
         """Extra pin-prick stars on clear patches of night sky: (x, y, radius, period, phase, sky colour)."""
         stars = []
-        while len(stars) < FAINT_STARS:
-            x, y = rng.randrange(20, W - 20), rng.randrange(40, H - 140)
-            if PLUME.inflate(30, 30).collidepoint(x, y):
+        sky, tries = self.L["sky"], 0
+        while len(stars) < FAINT_STARS and tries < 20000:
+            tries += 1
+            x, y = rng.randrange(sky.left, sky.right), rng.randrange(sky.top, sky.bottom)
+            if self.PLUME.inflate(30, 30).collidepoint(x, y):
                 continue
             patch = [self.art.get_at((x + dx, y + dy)) for dx in (-4, 0, 4) for dy in (-4, 0, 4)]
             if all(p.r < 50 and p.g < 70 and p.b > 35 for p in patch):
@@ -193,8 +214,9 @@ class CosmonautFace:
         self._render_time(surf, clock)
 
         date = now.strftime("%a %d %b %Y").upper()
-        date_surf = ui.distress(ui.text_fit(date, ANTON, DATE_CAP, PAPER, 420, tracking=3), 2)
-        surf.blit(date_surf, date_surf.get_rect(center=(SUN_X, DATE_Y)))
+        date_y, date_cap, date_w = self.L["date"]
+        date_surf = ui.distress(ui.text_fit(date, ANTON, date_cap, PAPER, date_w, tracking=3), 2)
+        surf.blit(date_surf, date_surf.get_rect(center=(self.L["sun_x"], date_y)))
 
         w = self.ctx.weather.current
         rows = (
@@ -203,24 +225,24 @@ class CosmonautFace:
             (icons.icon("gauge", 58, PAPER), f"{w['pressure']} hPa" if w else "--", 30),
             (icons.icon("wind", 58, PAPER), f"{w['wind']} {w['wind_unit']} {w['wind_dir']}" if w else "--", 30),
         )
-        for y, (icon, value, cap) in zip(ROWS_Y, rows):
-            surf.blit(icon, icon.get_rect(center=(ICON_X, y)))
-            value_surf = ui.text_fit(value, ui.LABEL_BOLD, cap, PAPER, VALUE_MAX_W)
-            surf.blit(value_surf, value_surf.get_rect(midleft=(VALUE_X, y)))
+        for (icon_x, value_x, value_w, y), (icon, value, cap) in zip(self.L["weather"], rows):
+            surf.blit(icon, icon.get_rect(center=(icon_x, y)))
+            value_surf = ui.text_fit(value, ui.LABEL_BOLD, cap, PAPER, value_w)
+            surf.blit(value_surf, value_surf.get_rect(midleft=(value_x, y)))
         return surf
 
     def _render_time(self, surf, clock):
         """Draw the digits onto `surf`; keep the colon aside so draw() can flash it."""
-        cap = TIME_CAP
+        time_y, cap, max_w = self.L["time"]
         while True:
             full, ink, spans = ui.fixed_digits(clock, ANTON, ui.size_for_cap(ANTON, cap), PAPER)
-            if ink.width <= TIME_MAX_W:
+            if ink.width <= max_w:
                 break
             cap -= 4
         full = ui.distress(full, 1)
         x, width = spans[clock.index(":")]
         gap = pygame.Rect(x, 0, width, full.get_height())
-        origin = (SUN_X - ink.centerx, TIME_Y - ink.centery)
+        origin = (self.L["sun_x"] - ink.centerx, time_y - ink.centery)
 
         self.colon = (full.subsurface(gap).copy(), (origin[0] + gap.x, origin[1]))
         full.fill((0, 0, 0, 0), gap)
@@ -247,7 +269,7 @@ class CosmonautFace:
         return max((_closure(t - start) for start in self.blinks), default=0.0)
 
     def _draw_plume(self, surf, t):
-        buf, smoke = self.plume_buf, self.plume_smoke
+        buf, smoke, PLUME = self.plume_buf, self.plume_smoke, self.PLUME
         buf.blit(self.plume_sky, (0, 0))
         w = smoke.get_width()
         for y in range(PLUME.height):
