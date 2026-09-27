@@ -13,7 +13,7 @@
     "quiet_to": "07:00"
   },
   "display": {
-    "orientation": "landscape",
+    "orientation": "auto",
     "day": 100,
     "night": 20,
     "dim_from": "22:00",
@@ -26,5 +26,9 @@
   "units": {
     "temperature": "celsius",
     "wind": "mph"
+  },
+  "sense": {
+    "temp_trim": 0.0,
+    "swap_portrait": false
   }
 }

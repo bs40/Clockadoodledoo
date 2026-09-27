@@ -16,10 +16,27 @@ Python + pygame-ce; the same code runs in a window on a PC for development.
 Tap, click or Space switches to the next face. Esc or Q quits.
 `--screenshot out.png` renders one frame and exits. On the Pi, add `--fullscreen`.
 
+## Sense HAT
+
+With a Raspberry Pi Sense HAT fitted (`pi/install.sh` installs the `sense-hat` package and
+makes the venv able to see it), `clock/sensehat.py` reads it on a background thread:
+
+- room temperature, humidity and pressure. Every face shows the room temperature, and its
+  HUMIDITY and PRESSURE readouts switch from the weather service to the sensors. The HAT's
+  thermometer sits over the CPU and reads high, so the temperature is compensated with the CPU
+  temperature and then offset by the panel's ROOM TEMP TRIM (set it against a real thermometer).
+- which way up the clock is, from the accelerometer. With ORIENTATION set to AUTO (SENSE HAT),
+  turning the clock switches it between landscape and portrait by itself, a couple of seconds
+  after it settles. If the two portrait directions come out reversed, set `sense.swap_portrait`
+  to true in `config.json`.
+
+Without a HAT nothing changes: readings come from the weather service and AUTO means landscape.
+
 ## Orientation
 
 Every face has a landscape (1600x720) and a portrait (720x1600) layout. The settings panel's
-ORIENTATION row picks LANDSCAPE, PORTRAIT or PORTRAIT FLIPPED; the clock draws the portrait
+ORIENTATION row picks AUTO (SENSE HAT), LANDSCAPE, PORTRAIT, PORTRAIT FLIPPED or LANDSCAPE
+FLIPPED; the clock draws the portrait
 canvas and turns it onto the screen itself (touch positions are turned to match), so the
 screen can simply be stood on its end with no operating-system changes. PORTRAIT puts the top
 of the picture at the screen's left edge; if it comes up upside down, choose PORTRAIT FLIPPED.
@@ -56,6 +73,7 @@ Portrait backgrounds for the artwork faces are composed from pieces of the mocku
 - `clock/app.py` - main loop
 - `clock/faces/` - one module per face; register new ones in `faces/__init__.py`
 - `clock/weather.py` - Open-Meteo current conditions + sunrise/sunset, refreshed every 15 min
+- `clock/sensehat.py` - Sense HAT room readings and tilt (see Sense HAT below)
 - `clock/astro.py` - moon phase
 - `clock/ui.py`, `clock/icons.py` - palette, fonts, tracked text, vector icons
 - `assets/fonts/` - Michroma, Barlow Condensed, Anton, Russo One, Press Start 2P and Silkscreen (SIL OFL, licences alongside)

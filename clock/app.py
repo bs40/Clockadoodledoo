@@ -16,7 +16,7 @@ UPDATE_MAX_WAIT_H = 30                   # restart for an update anyway after th
 
 # How the drawn picture is turned to land the right way up on the physically-mounted screen.
 # "portrait": the picture's top is at the screen's left edge (screen stood on its left side).
-ROTATION = {"landscape": 0, "portrait": 90, "portrait-flipped": -90}
+ROTATION = {"landscape": 0, "portrait": 90, "portrait-flipped": -90, "landscape-flipped": 180}
 
 
 def load_config():
@@ -64,6 +64,7 @@ def main(argv=None):
     from .settings import Settings
     from .weather import Weather
     from .schedule import in_window
+    from .sensehat import Sense, merged
 
     config = load_config()
     if args.chime is not None:
@@ -88,21 +89,32 @@ def main(argv=None):
         weather.fetch_once()
     else:
         weather.start()
-    ctx = SimpleNamespace(config=config, config_path=CONFIG, weather=weather, orientation="landscape")
+    sense = Sense(config, demo=args.demo)
+    ctx = SimpleNamespace(config=config, config_path=CONFIG, weather=weather, sense=sense, orientation="landscape")
+    ctx.readings = lambda: merged(weather.current, sense.room)
+    ctx.readings_version = lambda: (weather.version, sense.version)
     chimes = ctx.chimes = Chimes(config)
     backlight = Backlight(config)
 
     # ---- orientation, canvas and faces: rebuilt whenever the orientation changes ---------
-    state = SimpleNamespace(names=[], current=0, loaded={}, canvas=None, rotation=0, fw=0, fh=0)
+    state = SimpleNamespace(names=[], current=0, loaded={}, canvas=None, rotation=0, fw=0, fh=0, applied=None)
     screen = None
 
+    def wanted_orientation():
+        """The configured orientation; "auto" follows the Sense HAT's accelerometer."""
+        choice = config["display"].get("orientation", "auto")
+        if choice == "auto":
+            return sense.orientation or "landscape"
+        return choice
+
     def layout_name():
-        return "portrait" if config["display"].get("orientation", "landscape").startswith("portrait") else "landscape"
+        return "portrait" if wanted_orientation().startswith("portrait") else "landscape"
 
     def apply_orientation(start_face=None):
         nonlocal screen
+        state.applied = wanted_orientation()
         ctx.orientation = layout_name()
-        state.rotation = ROTATION.get(config["display"].get("orientation", "landscape"), 0)
+        state.rotation = ROTATION.get(state.applied, 0)
         state.names = [n for n, f in FACES.items() if ctx.orientation in f.sizes]
         wanted = start_face or config["face"]
         state.current = state.names.index(wanted) if wanted in state.names else 0
@@ -143,8 +155,8 @@ def main(argv=None):
     def settings_saved():
         chimes.apply()
         backlight.reapply()
-        if layout_name() != ctx.orientation or ROTATION.get(config["display"].get("orientation"), 0) != state.rotation:
-            apply_orientation()
+        if wanted_orientation() != state.applied:
+            apply_orientation(state.names[state.current])
         show_face(config["face"])
 
     def quit_app():
@@ -166,6 +178,8 @@ def main(argv=None):
             return state.fw - 1 - y, x
         if rotated() and state.rotation == -90:
             return y, state.fh - 1 - x
+        if rotated() and state.rotation == 180:
+            return state.fw - 1 - x, state.fh - 1 - y
         return x, y
 
     def update_due(now):
@@ -177,6 +191,7 @@ def main(argv=None):
             or waited_h > UPDATE_MAX_WAIT_H
 
     last_update_check = -60_000       # check straight away, then every 30 s
+    last_tilt_check = 0
     running = True
     while running:
         for event in pygame.event.get():
@@ -214,6 +229,10 @@ def main(argv=None):
                 UPDATE_FLAG.unlink()
                 pygame.quit()
                 os.execv(sys.executable, [sys.executable] + sys.argv)
+        if pygame.time.get_ticks() - last_tilt_check > 1000:
+            last_tilt_check = pygame.time.get_ticks()
+            if not settings.visible and wanted_orientation() != state.applied:   # the clock was turned
+                apply_orientation(state.names[state.current])
         chimes.tick(now)
         backlight.tick(now)
         canvas = state.canvas

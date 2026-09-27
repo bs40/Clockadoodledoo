@@ -118,9 +118,12 @@ class SaturnFace:
         full.fill((0, 0, 0, 0), gap)
         surf.blit(full, origin)
 
-        w = self.ctx.weather.current
-        values = (f"{w['temp']}{w['temp_unit']}", f"{w['humidity']}%", f"{w['pressure']} hPa",
-                  f"{w['wind']} {w['wind_unit']} {w['wind_dir']}") if w else ("--",) * 4
+        w = self.ctx.readings() or {}
+        temp = f"{w['temp']}{w['temp_unit']}" if "temp" in w else "--"
+        if "room_temp" in w:                      # outside / room
+            temp = f"{temp} OUT  {w['room_temp']:.1f}\u00b0C IN" if "temp" in w else f"{w['room_temp']:.1f}\u00b0C IN"
+        values = (temp, f"{w['humidity']}%" if "humidity" in w else "--", f"{w['pressure']} hPa" if "pressure" in w else "--",
+                  f"{w['wind']} {w['wind_unit']} {w['wind_dir']}" if "wind" in w else "--")
         for value, (x, y, cap, max_w) in zip(values, L["values"]):
             t = ui.text_fit(value, ui.LABEL_MED, self.S(cap), PAPER, self.S(max_w), tracking=1)
             surf.blit(t, t.get_rect(midleft=self.P(x, y)))
@@ -168,7 +171,7 @@ class SaturnFace:
                 pygame.draw.line(surf, c, a, b, 2 if i < LEN // 3 else 1)
 
     def draw(self, surf, now):
-        key = (now.strftime("%Y%m%d%H%M"), self.ctx.weather.version)
+        key = (now.strftime("%Y%m%d%H%M"), self.ctx.readings_version())
         if key != self.static_key:
             self.static = self._render_static(now)
             self.static_key = key

@@ -28,7 +28,7 @@ LAYOUTS = {
     "landscape": dict(
         size=(1600, 720), image="background.png", scale=K, offset=(0, Y0), panel=None,
         date=(1410, 92, 30, 400), time=(1640, 215, 109, 375), icon=(1500, 395, 7),
-        temp=(1620, 362, 44, 230), summary=(1620, 436, 23, 240),
+        temp=(1620, 362, 44, 230), summary=(1620, 436, 23, 240), room=(1620, 482, 19, 240),
         values=[(None, 1665, y, 23, 200) for y in (573, 632, 688)], divider=None,
         city=pygame.Rect(20, 40, 1090, 620),
         neon=(pygame.Rect(150, 145, 212, 152), pygame.Rect(378, 205, 95, 205)),   # ramen sign, lantern
@@ -36,7 +36,7 @@ LAYOUTS = {
     "portrait": dict(
         size=(720, 1600), image="portrait.png", scale=1.0, offset=(0, 0), panel=pygame.Rect(24, 830, 672, 746),
         date=(60, 900, 30, 600), time=(360, 1010, 132, 620), icon=(150, 1180, 8),
-        temp=(270, 1150, 52, 300), summary=(270, 1222, 26, 400),
+        temp=(270, 1150, 52, 300), summary=(270, 1222, 26, 400), room=(270, 1268, 20, 400),
         values=[(label, 380, y, 28, 300) for label, y in (("HUMIDITY", 1370), ("WIND", 1440), ("PRESSURE", 1510))],
         divider=(60, 1300, 660),
         city=pygame.Rect(0, 0, 720, 809),
@@ -158,16 +158,21 @@ class PixelFace:
         full.fill((0, 0, 0, 0), gap)
         surf.blit(full, origin)
 
-        w = self.ctx.weather.current
-        self.icon_name = w["icon"] if w else "cloud"
+        w = self.ctx.readings() or {}
+        self.icon_name = w.get("icon", "cloud")
         x, y, cap, max_w = L["temp"]
-        temp = ui.text_fit(f"{w['temp']}{w['temp_unit']}" if w else "--", PIXEL, cap, CREAM, max_w, tracking=3)
+        temp = ui.text_fit(f"{w['temp']}{w['temp_unit']}" if "temp" in w else "--", PIXEL, cap, CREAM, max_w, tracking=3)
         surf.blit(temp, temp.get_rect(midleft=self.P(x, y)))
         x, y, cap, max_w = L["summary"]
-        summary = ui.text_fit(w["summary"] if w else "NO DATA YET", PIXEL, cap, CREAM, max_w, tracking=3)
+        summary = ui.text_fit(w.get("summary", "NO DATA YET"), PIXEL, cap, CREAM, max_w, tracking=3)
         surf.blit(summary, summary.get_rect(midleft=self.P(x, y)))
-        values = (f"{w['humidity']}%", f"{w['wind']} {w['wind_unit']} {w['wind_dir']}", f"{w['pressure']} hPa") \
-            if w else ("--",) * 3
+        if "room_temp" in w:
+            x, y, cap, max_w = L["room"]
+            room = ui.text_fit(f"ROOM {w['room_temp']:.1f}\u00b0C", PIXEL, cap, CYAN, max_w, tracking=3)
+            surf.blit(room, room.get_rect(midleft=self.P(x, y)))
+        values = (f"{w['humidity']}%" if "humidity" in w else "--",
+                  f"{w['wind']} {w['wind_unit']} {w['wind_dir']}" if "wind" in w else "--",
+                  f"{w['pressure']} hPa" if "pressure" in w else "--")
         for value, (label, x, y, cap, max_w) in zip(values, L["values"]):
             if label:                                     # portrait draws its own labels
                 t = ui.text_fit(label, PIXEL, cap, CYAN, 300, tracking=3)
@@ -199,7 +204,7 @@ class PixelFace:
             surf.blit(self.shade[i], rect)
 
     def draw(self, surf, now):
-        key = (now.strftime("%Y%m%d%H%M"), self.ctx.weather.version)
+        key = (now.strftime("%Y%m%d%H%M"), self.ctx.readings_version())
         if key != self.static_key:
             self.static = self._render_static(now)
             self.static_key = key

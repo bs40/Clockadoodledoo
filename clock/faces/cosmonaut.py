@@ -56,14 +56,15 @@ LAYOUTS = {
         size=(1600, 720), image="background.png",
         sun_x=915, date=(161, 36, 420), time=(307, 192, 520),
         # weather column: (icon x, value x, value width) and a y for each of the four rows
-        weather=[(1378, 1428, 148, y) for y in (130, 237, 317, 397)],
+        weather=[(1378, 1428, 148, y) for y in (130, 237, 317, 397, 470)],
         sparkles=((618, 91, 34), (53, 97, 24), (676, 565, 36), (738, 453, 22), (1191, 78, 22)),
         plume=pygame.Rect(1220, 328, 98, 222), eyes=EYES, sky=pygame.Rect(20, 40, 1560, 540),
     ),
     "portrait": dict(
         size=(720, 1600), image="portrait.png",
         sun_x=349, date=(662, 40, 600), time=(846, 236, 620),
-        weather=[(110, 160, 190, 1045), (410, 460, 190, 1045), (110, 160, 190, 1140), (410, 460, 190, 1140)],
+        weather=[(110, 160, 190, 1045), (410, 460, 190, 1045), (110, 160, 190, 1140), (410, 460, 190, 1140),
+                 (110, 160, 190, 1235)],
         sparkles=((33, 1203, 36), (116, 1056, 22), (622, 205, 18)),
         plume=pygame.Rect(284, 1300, 112, 131), eyes=[_portrait_eye(e) for e in EYES],
         sky=pygame.Rect(20, 20, 680, 1270),
@@ -218,13 +219,15 @@ class CosmonautFace:
         date_surf = ui.distress(ui.text_fit(date, ANTON, date_cap, PAPER, date_w, tracking=3), 2)
         surf.blit(date_surf, date_surf.get_rect(center=(self.L["sun_x"], date_y)))
 
-        w = self.ctx.weather.current
-        rows = (
-            (icons.icon(w["icon"] if w else "sun", 80, POSTER_RED), f"{w['temp']}{w['temp_unit']}" if w else "--", 38),
-            (icons.icon("drop", 58, PAPER), f"{w['humidity']}%" if w else "--", 30),
-            (icons.icon("gauge", 58, PAPER), f"{w['pressure']} hPa" if w else "--", 30),
-            (icons.icon("wind", 58, PAPER), f"{w['wind']} {w['wind_unit']} {w['wind_dir']}" if w else "--", 30),
-        )
+        w = self.ctx.readings() or {}
+        rows = [
+            (icons.icon(w.get("icon", "sun"), 80, POSTER_RED), f"{w['temp']}{w['temp_unit']}" if "temp" in w else "--", 38),
+            (icons.icon("drop", 58, PAPER), f"{w['humidity']}%" if "humidity" in w else "--", 30),
+            (icons.icon("gauge", 58, PAPER), f"{w['pressure']} hPa" if "pressure" in w else "--", 30),
+            (icons.icon("wind", 58, PAPER), f"{w['wind']} {w['wind_unit']} {w['wind_dir']}" if "wind" in w else "--", 30),
+        ]
+        if "room_temp" in w:
+            rows.append((icons.icon("thermo", 58, PAPER), f"{w['room_temp']:.1f}\u00b0C", 30))
         for (icon_x, value_x, value_w, y), (icon, value, cap) in zip(self.L["weather"], rows):
             surf.blit(icon, icon.get_rect(center=(icon_x, y)))
             value_surf = ui.text_fit(value, ui.LABEL_BOLD, cap, PAPER, value_w)
@@ -279,7 +282,7 @@ class CosmonautFace:
         surf.blit(pygame.transform.smoothscale(buf, PLUME.size), PLUME.topleft)
 
     def draw(self, surf, now):
-        key = (now.strftime("%Y%m%d%H%M"), self.ctx.weather.version)
+        key = (now.strftime("%Y%m%d%H%M"), self.ctx.readings_version())
         if key != self.static_key:
             self.static = self._render_static(now)
             self.static_key = key

@@ -92,6 +92,18 @@ def _wind(surf, s, c):
             + _arc_pts(0.50 * s, 0.82 * s, 0.10 * s, -90, 140), w)
 
 
+def _thermo(surf, s, c):
+    w = int(0.07 * s)
+    _stroke(surf, c, [(0.5 * s, 0.14 * s), (0.5 * s, 0.62 * s)], int(0.2 * s))
+    surf.fill(CLEAR, pygame.Rect(int(0.42 * s), int(0.14 * s), int(0.16 * s), int(0.44 * s)))
+    _stroke(surf, c, [(0.5 * s, 0.14 * s), (0.5 * s, 0.62 * s)], int(0.2 * s))
+    pygame.draw.rect(surf, CLEAR, pygame.Rect(int(0.455 * s), int(0.18 * s), int(0.09 * s), int(0.38 * s)))
+    pygame.draw.circle(surf, c, (int(0.5 * s), int(0.74 * s)), int(0.16 * s))
+    pygame.draw.rect(surf, c, pygame.Rect(int(0.455 * s), int(0.4 * s), int(0.09 * s), int(0.3 * s)))
+    for y in (0.24, 0.34, 0.44):
+        _stroke(surf, c, [(0.64 * s, y * s), (0.72 * s, y * s)], w)
+
+
 def _horizon(surf, s, c, rising):
     _sun(surf, s, c, 0.5, 0.62, 0.9)
     surf.fill(CLEAR, pygame.Rect(0, int(0.62 * s), s, s))
@@ -103,7 +115,7 @@ def _horizon(surf, s, c, rising):
 
 _DRAWERS = {
     "sun": _sun, "cloud": _cloud, "partly": _partly, "rain": _rain, "snow": _snow,
-    "storm": _storm, "fog": _fog, "drop": _drop, "gauge": _gauge, "wind": _wind,
+    "storm": _storm, "fog": _fog, "drop": _drop, "gauge": _gauge, "wind": _wind, "thermo": _thermo,
     "sunrise": lambda surf, s, c: _horizon(surf, s, c, True),
     "sunset": lambda surf, s, c: _horizon(surf, s, c, False),
 }

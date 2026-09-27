@@ -31,14 +31,14 @@ LAYOUTS = {
         size=(1600, 720), centre=(930, 300), flatten=0.62, orbit_scale=1.0, reach=400, stars=420,
         quiet=(pygame.Rect(90, 50, 490, 570), pygame.Rect(1370, 80, 180, 310), pygame.Rect(990, 580, 560, 90)),
         legend=[(1392, 100 + i * 52) for i in range(6)],
-        time=(104, 52, 112), date=(110, 196), rule=(110, 268, 550), rows=(110, 318, 64),
+        time=(104, 52, 112), date=(110, 196), rule=(110, 268, 550), rows=(110, 312, 56),
         greeting=(1530, 600, "midright"), slogan=(1530, 648, "midright"),
     ),
     "portrait": dict(
         size=(720, 1600), centre=(360, 640), flatten=0.72, orbit_scale=0.8, reach=310, stars=360,
         quiet=(pygame.Rect(40, 40, 640, 260), pygame.Rect(40, 900, 640, 660)),
         legend=[(96 + (i % 3) * 200, 940 + (i // 3) * 46) for i in range(6)],
-        time=(50, 60, 128), date=(58, 210), rule=(58, 280, 662), rows=(58, 1080, 62),
+        time=(50, 60, 128), date=(58, 210), rule=(58, 280, 662), rows=(58, 1066, 58),
         greeting=(360, 1500, "center"), slogan=(360, 1546, "center"),
     ),
 }
@@ -144,11 +144,15 @@ class OrreryFace:
 
     # ---- text layer, re-rendered when something on it changes ------------
     def _rows(self, now):
-        w = self.ctx.weather.current
+        w = self.ctx.readings()
         dash = "--"
         rows = [
-            (icons.icon(w["icon"] if w else "sun", 42, ui.CREAM),
-             f"{w['temp']}{w['temp_unit']}" if w else dash, w["summary"] if w else "NO DATA YET"),
+            (icons.icon(w["icon"] if w and "icon" in w else "sun", 42, ui.CREAM),
+             f"{w['temp']}{w['temp_unit']}" if w and "temp" in w else dash, w["summary"] if w and "summary" in w else "NO DATA YET"),
+        ]
+        if w and "room_temp" in w:
+            rows.append((icons.icon("thermo", 42, ui.CREAM), f"{w['room_temp']:.1f}\u00b0C", "ROOM"))
+        rows += [
             (icons.icon("drop", 42, ui.CREAM), f"{w['humidity']}%" if w else dash, "HUMIDITY"),
             (icons.icon("gauge", 42, ui.CREAM), f"{w['pressure']} hPa" if w else dash, "PRESSURE"),
             (icons.icon("wind", 42, ui.CREAM),
@@ -186,7 +190,7 @@ class OrreryFace:
 
     # ---- per frame -------------------------------------------------------
     def draw(self, surf, now):
-        key = (now.strftime("%Y%m%d%H%M"), self.ctx.weather.version)
+        key = (now.strftime("%Y%m%d%H%M"), self.ctx.readings_version())
         if key != self.static_key:
             self.static = self._render_static(now)
             self.static_key = key

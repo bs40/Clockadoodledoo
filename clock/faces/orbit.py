@@ -56,7 +56,7 @@ LAYOUTS = {
         text=_map(0, 0, K, 0, Y0), crosshairs=((1265, 100), (1575, 643)), panels=None, frame=None,
         lat=(688, 96, 23, 260), lon=(1005, 96, 23, 260),
         day=(100, 603, 48, 330), date=(100, 669, 39, 310), icon=(636, 638, 104),
-        temp=(750, 608, 46, 165), summary=(755, 682, 22, 165),
+        temp=(750, 608, 46, 165), summary=(755, 672, 22, 165), room=(755, 716, 20, 165),
         readings=[(None, 1283, y, 25, 150) for y in (580, 641, 706)], slogan=None,
     ),
     "portrait": dict(
@@ -67,7 +67,7 @@ LAYOUTS = {
         frame=pygame.Rect(6, 6, 708, 1588),
         lat=(688, 96, 16, 200), lon=(1005, 96, 16, 200),
         day=(56, 870, 52, 280), date=(56, 962, 36, 280), icon=(450, 900, 100),
-        temp=(520, 875, 44, 160), summary=(520, 945, 20, 160),
+        temp=(520, 875, 44, 160), summary=(520, 940, 20, 160), room=(520, 990, 20, 160),
         readings=[(label, 340, y, 26, 300) for label, y in (("WIND", 1110), ("HUMIDITY", 1185), ("PRESSURE", 1260))],
         slogan=((360, 1400, "A CALMER PLANET"), (360, 1442, "IS A BRIGHTER TOMORROW")),
     ),
@@ -215,19 +215,23 @@ class OrbitFace:
         date = ui.text_fit(now.strftime("%d %b %Y").upper(), ui.LABEL_BOLD, cap, PAPER, max_w, tracking=2)
         surf.blit(date, date.get_rect(midleft=T(x, y)))
 
-        w = self.ctx.weather.current
+        w = self.ctx.readings() or {}
         x, y, size = L["icon"]
-        icon = icons.icon(w["icon"] if w else "sun", size, AMBER)
+        icon = icons.icon(w.get("icon", "sun"), size, AMBER)
         surf.blit(icon, icon.get_rect(center=T(x, y)))
         x, y, cap, max_w = L["temp"]
-        temp = ui.text_fit(f"{w['temp']}{w['temp_unit']}" if w else "--", ui.LABEL_BOLD, cap, AMBER, max_w, tracking=3)
+        temp = ui.text_fit(f"{w['temp']}{w['temp_unit']}" if "temp" in w else "--", ui.LABEL_BOLD, cap, AMBER, max_w, tracking=3)
         surf.blit(temp, temp.get_rect(midleft=T(x, y)))
         x, y, cap, max_w = L["summary"]
-        summary = ui.text_fit(w["summary"] if w else "NO DATA YET", ui.LABEL_MED, cap, PAPER, max_w, tracking=4)
+        summary = ui.text_fit(w.get("summary", "NO DATA YET"), ui.LABEL_MED, cap, PAPER, max_w, tracking=4)
         surf.blit(summary, summary.get_rect(midleft=T(x, y)))
+        if "room_temp" in w:
+            x, y, cap, max_w = L["room"]
+            room = ui.text_fit(f"ROOM {w['room_temp']:.1f}\u00b0C", ui.LABEL_MED, cap, AMBER, max_w, tracking=3)
+            surf.blit(room, room.get_rect(midleft=T(x, y)))
 
-        values = (f"{w['wind']} {w['wind_unit']} {w['wind_dir']}", f"{w['humidity']}%", f"{w['pressure']} hPa") \
-            if w else ("--", "--", "--")
+        values = (f"{w['wind']} {w['wind_unit']} {w['wind_dir']}" if "wind" in w else "--",
+                  f"{w['humidity']}%" if "humidity" in w else "--", f"{w['pressure']} hPa" if "pressure" in w else "--")
         for value, (label, x, y, cap, max_w) in zip(values, L["readings"]):
             if label:                                  # portrait draws its own labels
                 t = ui.text_fit(label, ui.LABEL_MED, cap, PAPER, 240, tracking=3)
@@ -242,7 +246,7 @@ class OrbitFace:
 
     # ---- per frame -----------------------------------------------------------
     def draw(self, surf, now):
-        key = (now.strftime("%Y%m%d"), self.ctx.weather.version)
+        key = (now.strftime("%Y%m%d"), self.ctx.readings_version())
         if key != self.static_key:
             self.static = self._render_static(now)
             self.static_key = key

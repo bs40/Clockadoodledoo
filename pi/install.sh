@@ -8,10 +8,10 @@ cd "$(dirname "$0")/.."
 HERE="$(pwd)"
 
 sudo apt-get update
-sudo apt-get install -y python3-venv ddcutil
+sudo apt-get install -y python3-venv ddcutil sense-hat   # sense-hat: optional Sense HAT sensors
 sudo usermod -aG i2c "$USER"        # lets ddcutil set the screen brightness later
 
-python3 -m venv .venv
+python3 -m venv --system-site-packages .venv   # so the venv can see the Sense HAT library
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
 

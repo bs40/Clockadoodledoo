@@ -15,8 +15,8 @@ from .schedule import step_hhmm
 
 BTN_W, BTN_H = 62, 54          # the < > buttons
 VALUE_W = 226
-SECTIONS = ("CLOCK & CHIME", "DISPLAY")
-ORIENTATIONS = ("landscape", "portrait", "portrait-flipped")
+SECTIONS = ("CLOCK, CHIME & SENSOR", "DISPLAY")
+ORIENTATIONS = ("auto", "landscape", "portrait", "portrait-flipped", "landscape-flipped")
 
 BG = (9, 19, 27)
 BORDER = (122, 214, 228)
@@ -36,10 +36,10 @@ def _layout(size):
     w, h = size
     if w >= h:                                          # landscape: two columns side by side
         return dict(panel=pygame.Rect(110, 50, w - 220, h - 100), cols=(150, 830), col_w=620,
-                    row0=172, row_h=66, ctrl_x=290, stacked=False,
+                    row0=172, row_h=58, ctrl_x=290, stacked=False,
                     buttons=((w // 2 - 340, 200), (w // 2 - 100, 200), (w - 370, 200)))
-    return dict(panel=pygame.Rect(24, 40, w - 48, 1090), cols=(56, 56), col_w=w - 112,
-                row0=176, row_h=62, ctrl_x=250, stacked=True,
+    return dict(panel=pygame.Rect(24, 40, w - 48, 1190), cols=(56, 56), col_w=w - 112,
+                row0=176, row_h=60, ctrl_x=250, stacked=True,
                 buttons=((36, 200), (260, 200), (484, 200)))
 
 
@@ -95,11 +95,19 @@ class Settings:
             d()["clock"]["24_hour"] = not d()["clock"]["24_hour"]
 
         def orientation():
-            return d()["display"].get("orientation", "landscape").replace("-", " ").upper()
+            cur = d()["display"].get("orientation", "auto")
+            return "AUTO (SENSE HAT)" if cur == "auto" else cur.replace("-", " ").upper()
 
         def orientation_change(k):
-            cur = d()["display"].get("orientation", "landscape")
+            cur = d()["display"].get("orientation", "auto")
             d()["display"]["orientation"] = ORIENTATIONS[(ORIENTATIONS.index(cur) + k) % len(ORIENTATIONS)]
+
+        def trim():
+            return f"{d().setdefault('sense', {}).get('temp_trim', 0.0):+.1f}\u00b0"
+
+        def trim_change(k):
+            sense = d().setdefault("sense", {})
+            sense["temp_trim"] = round(min(max(sense.get("temp_trim", 0.0) + k * 0.5, -10.0), 10.0), 1)
 
         return [
             (0, "SOUND", *spin_choice("chime", "sound", available)),
@@ -108,6 +116,7 @@ class Settings:
             (0, "QUIET FROM", *spin_time("chime", "quiet_from")),
             (0, "QUIET UNTIL", *spin_time("chime", "quiet_to")),
             (0, "CLOCK", lambda: "24 HOUR" if d()["clock"]["24_hour"] else "12 HOUR", clock_change),
+            (0, "ROOM TEMP TRIM", trim, trim_change),
             (1, "FACE", lambda: d()["face"].upper(), face_change),
             (1, "ORIENTATION", orientation, orientation_change),
             (1, "DAY BRIGHTNESS", *spin_num("display", "day", 10, 100, 10, lambda v: f"{v}%")),
