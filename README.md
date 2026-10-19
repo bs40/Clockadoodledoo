@@ -123,4 +123,4 @@ publishing a change is a `git push`. `deploy` still works for pushing straight t
 without going through GitHub, but the next update check will replace whatever it copied.
 The source mockup PNGs (`retface*.png`, `pixface*.png`) are not committed; only the prepared backgrounds are.
 
-Repository: https://github.com/bs40/Clockadoodledoo (private). Publish a change with `git push`; the Pi picks it up within 5 minutes.
+Repository: https://github.com/bs40/Clockadoodledoo. Publish a change with `git push`; the Pi picks it up within 5 minutes.
