@@ -102,7 +102,8 @@ class Meteor:
     LENGTH, TIME, TRAVEL = 90, 0.9, 260
 
     def __init__(self, art, sky, x_range, colour, y_range=None):
-        self.art, self.sky, self.x_range, self.colour = art, sky, x_range, colour
+        self.art, self.x_range, self.colour = art, x_range, colour
+        self.sky = sky.clip(art.get_rect())            # a mapped sky can overhang the picture's edge
         self.y_range = y_range or (sky.top + 20, sky.top + 100)
         self.meteor, self.next = None, None
         self.rng = random.Random()
@@ -275,6 +276,10 @@ class ArtworkFace:
     ICON_INK = {}                    # icon colours by row kind (defaults to INK)
     TIME_INK = None                  # the big digits (defaults to INK)
     TIME_FONT = ANTON
+    DATE_FONT = ui.LABEL_BOLD
+    VALUE_FONT = ui.LABEL_MED
+    DATE_FORMAT = "%a %d %b %Y"
+    SHORT_VALUES = False             # pressure without "hPa", wind as just its speed
     DISTRESS = True
 
     def __init__(self, ctx):
@@ -365,13 +370,15 @@ class ArtworkFace:
                 return (f"{outside} OUT  {room} IN" if outside else f"{room} IN"), ""
             return outside or "--", ""
         value = {"humidity": f"{w['humidity']}%" if "humidity" in w else "--",
-                 "pressure": f"{w['pressure']} hPa" if "pressure" in w else "--",
-                 "wind": f"{w['wind']} {w['wind_unit']} {w['wind_dir']}" if "wind" in w else "--"}[kind]
+                 "pressure": f"{w['pressure']}" if "pressure" in w else "--",
+                 "wind": f"{w['wind']}" if "wind" in w else "--"}[kind]
+        if not self.SHORT_VALUES and value != "--":
+            value += {"humidity": "", "pressure": " hPa", "wind": f" {w.get('wind_unit', '')} {w.get('wind_dir', '')}"}[kind]
         return value, LABELS[kind]
 
     def _render_static(self, now):
         L, surf = self.L, self.art.copy()
-        self.put(surf, now.strftime("%a %d %b %Y").upper(), L["date"], ui.LABEL_BOLD, self.INK, tracking=L.get("date_tracking", 6), distress=3)
+        self.put(surf, now.strftime(self.DATE_FORMAT).upper(), L["date"], self.DATE_FONT, self.INK, tracking=L.get("date_tracking", 6), distress=3)
         self._render_time(surf, now)
         w = self.ctx.readings() or {}
         label_ink = self.LABEL_INK or self.INK
@@ -382,7 +389,7 @@ class ArtworkFace:
                 name = w.get("icon", "sun") if row["kind"] == "temp" else ICONS.get(row["kind"], "thermo")
                 icon = icons.icon(name, self.S(size), self.ICON_INK.get(row["kind"], self.INK))
                 surf.blit(icon, icon.get_rect(center=self.P(x, y)))
-            self.put(surf, value, row["value"], ui.LABEL_MED, self.INK, tracking=1, distress=4)
+            self.put(surf, value, row["value"], self.VALUE_FONT, self.INK, tracking=1, distress=4)
             if row.get("label") and label:
                 self.put(surf, label, row["label"], ui.LABEL_BOLD, label_ink, tracking=2)
         for text, spec, colour, tracking in L.get("texts", ()):        # portrait labels and slogans

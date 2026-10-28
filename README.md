@@ -83,8 +83,27 @@ Portrait backgrounds for the artwork faces are composed from pieces of the mocku
 - `explorer` - astronaut on a red canyon world (`..._06_distant_world.png`, `tools\prep_explorer.py`).
   He blinks now and then, the star on his visor twinkles and a glint sweeps across it, the
   spaceplane's beacon and strobe blink, stars twinkle, an occasional meteor.
+- `rainbow` - rainbow valley (`face designs/psychedelic_clock_01_rainbow_valley.png`, `tools\prep_rainbow.py`).
+  The sun's glow breathes, a ring of light passes out across the rainbow now and then, stars
+  and sparkles twinkle, an occasional shooting star.
+- `vision` - cosmic vision (`..._02_cosmic_vision.png`, `tools\prep_vision.py`). The third-eye
+  starburst brightens and fades like breathing, the orbs down the tunnel of faces light up one
+  after another, the sparkle stars twinkle.
+- `tunnel` - flower tunnel (`..._03_flower_tunnel.png`, `tools\prep_tunnel.py`). The light at the
+  end breathes, the golden path on the water shimmers, specks of light drift out of the tunnel
+  and now and then a soft arch of light travels out through the flowers.
+- `rings` - ringed planet over a lake (`..._04_ringed_planet.png`, `tools\prep_rings.py`). The
+  lake shimmers, the moons glow, stars twinkle, an occasional shooting star.
+- `mandala` - meditation (`..._05_mandala_meditation.png`, `tools\prep_mandala.py`). One slow
+  breath every 7 s: light rises up the chakras to the crown, the mandala brightens, a ripple
+  spreads from the figure; the lotuses glow, stars twinkle.
+- `spiral` - flower spiral (`face designs/Psychedelic_Clock_06.png`, `tools\prep_spiral.py`). The
+  spiral turns slowly inward (one turn every 80 s), its centre glows, bokeh lights pulse. Built
+  from a small 755x332 copy of the design; for a sharper picture put a full-size copy in
+  `face designs` and change `SRC` in the prep script (and `POSTER_H` in `clock/faces/spiral.py`
+  if its proportions differ).
 
-The six retro-space faces (`launch` onwards) share `clock/faces/artwork.py`: the live readout
+The retro-space and psychedelic faces (`launch` onwards) share `clock/faces/artwork.py`: the live readout
 layer (date, time, weather rows) and small animation pieces (twinkling stars, sparkles, meteors,
 flicker, blinking lamps, a visor glint). Their `LAYOUTS` positions are in mockup pixels with the
 mockup scaled to 2000 px wide, which is also how their prep scripts measure.
@@ -100,7 +119,7 @@ mockup scaled to 2000 px wide, which is also how their prep scripts measure.
 - `clock/sensehat.py` - Sense HAT room readings and tilt (see Sense HAT below)
 - `clock/astro.py` - moon phase
 - `clock/ui.py`, `clock/icons.py` - palette, fonts, tracked text, vector icons
-- `assets/fonts/` - Michroma, Barlow Condensed, Anton, Russo One, Press Start 2P and Silkscreen (SIL OFL, licences alongside)
+- `assets/fonts/` - Michroma, Barlow Condensed, Anton, Russo One, Press Start 2P, Silkscreen, Fraunces and Jost (SIL OFL, licences alongside)
 - `assets/sounds/` - chime files (see Chimes below)
 
 Faces draw at a fixed 1600x720; the app scales that to whatever window or screen it gets.
