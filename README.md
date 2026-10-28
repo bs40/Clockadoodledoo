@@ -64,8 +64,32 @@ Portrait backgrounds for the artwork faces are composed from pieces of the mocku
   blinking colon and an occasional meteor across the sky.
 - `pixel` - pixel-art city from `pixface1.png`, prepared by `tools\prep_pixel.py`. Rain falls over
   the city, the neon sign and lantern flicker, the pixel weather icon animates, the colon blinks.
+- `launch` - rocket climbing past the Earth, from `face designs/retro_space_clock_01_rocket_launch.png`,
+  prepared by `tools\prep_launch.py`. The exhaust flickers, the lens-flare star and faint stars
+  twinkle, the launch tower's beacons blink, the colon blinks.
+- `astronaut` - astronaut in a bubble helmet beside a ringed planet (`..._02_astronaut.png`,
+  `tools\prep_astronaut.py`). She blinks now and then, a glint sweeps across her helmet every
+  half minute or so, the city's windows glow and its spires' beacons blink, stars twinkle.
+- `control` - control room looking out at the Earth (`..._03_control_room.png`, `tools\prep_control.py`).
+  The right-hand column is a small live story: altitude and velocity drift over each 92-minute
+  orbit and NEXT ORBIT counts down to the next one. Console screens pulse, lamps blink, the radar
+  scope sweeps, the sparkle star and window stars twinkle, an occasional meteor.
+- `colony` - robot overlooking a Mars colony (`..._04_robot_colony.png`, `tools\prep_colony.py`).
+  The robot's eyes glow and dim, its antenna and the colony's tower lamps blink, the dome's
+  windows glow, stars twinkle, an occasional meteor.
+- `station` - rocket ship passing a wheel station (`..._05_orbital_station.png`, `tools\prep_station.py`).
+  The engine flames flicker and waver, beacons blink on the ship and the station, stars twinkle,
+  an occasional meteor. The VISIBLE TONIGHT panel is part of the artwork.
+- `explorer` - astronaut on a red canyon world (`..._06_distant_world.png`, `tools\prep_explorer.py`).
+  He blinks now and then, the star on his visor twinkles and a glint sweeps across it, the
+  spaceplane's beacon and strobe blink, stars twinkle, an occasional meteor.
 
-`tools\poster.py` holds the shared paint-out and letterbox steps the prep scripts use.
+The six retro-space faces (`launch` onwards) share `clock/faces/artwork.py`: the live readout
+layer (date, time, weather rows) and small animation pieces (twinkling stars, sparkles, meteors,
+flicker, blinking lamps, a visor glint). Their `LAYOUTS` positions are in mockup pixels with the
+mockup scaled to 2000 px wide, which is also how their prep scripts measure.
+
+`tools\poster.py` holds the shared paint-out, re-texturing and letterbox steps the prep scripts use.
 
 ## Layout
 
@@ -121,6 +145,7 @@ is open. `config.json` is untracked, so settings survive updates.
 Set it up once with `bash ~/clock/pi/enable-updates.sh REPO_URL` on the Pi. After that,
 publishing a change is a `git push`. `deploy` still works for pushing straight to the Pi
 without going through GitHub, but the next update check will replace whatever it copied.
-The source mockup PNGs (`retface*.png`, `pixface*.png`) are not committed; only the prepared backgrounds are.
+The source mockup PNGs (`retface*.png`, `pixface*.png` and the `face designs` folder) are not committed;
+only the prepared backgrounds are.
 
 Repository: https://github.com/bs40/Clockadoodledoo. Publish a change with `git push`; the Pi picks it up within 5 minutes.
