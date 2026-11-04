@@ -2,7 +2,7 @@
 # One-time setup on the Raspberry Pi. Run from the project folder:
 #     bash ~/clock/pi/install.sh
 # Installs Python dependencies into ~/clock/.venv, starts the clock full screen
-# at every boot, and turns off screen blanking.
+# at every boot (pi/autostart.sh; no desktop needed), and turns off screen blanking.
 set -e
 cd "$(dirname "$0")/.."
 HERE="$(pwd)"
@@ -15,19 +15,8 @@ python3 -m venv --system-site-packages .venv   # so the venv can see the Sense H
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
 
-mkdir -p ~/.config/autostart
-cat > ~/.config/autostart/clock.desktop <<DESKTOP
-[Desktop Entry]
-Type=Application
-Name=Clockadoodledoo
-Exec=$HERE/.venv/bin/python $HERE/run.py --fullscreen
-Path=$HERE
-X-GNOME-Autostart-enabled=true
-DESKTOP
-
 sudo raspi-config nonint do_blanking 1   # 1 = never blank the screen
-bash pi/icons.sh
+bash pi/autostart.sh                     # starts it now, and at every boot
 
 echo
-echo "Done. Reboot to start the clock:  sudo reboot"
-echo "To try it now without rebooting:  $HERE/.venv/bin/python run.py --fullscreen"
+echo "Done: the clock is running and will start at every boot."

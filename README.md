@@ -126,14 +126,26 @@ Faces draw at a fixed 1600x720; the app scales that to whatever window or screen
 
 ## Putting it on the Pi
 
-1. Flash Raspberry Pi OS (64-bit, with desktop) with Raspberry Pi Imager. In its settings set the
-   hostname to `clock`, a username and password, your Wi-Fi, and enable SSH.
+1. Flash Raspberry Pi OS (64-bit; Lite is enough, the clock needs no desktop) with Raspberry Pi
+   Imager. In its settings set the hostname to `clock`, a username and password, your Wi-Fi, and
+   enable SSH.
 2. Boot the Pi with the screen attached, then from this folder on the PC:  `deploy user@clock.local`
-3. On the Pi (over SSH or a keyboard):  `bash ~/clock/pi/install.sh`  then  `sudo reboot`
+3. On the Pi (over SSH or a keyboard):  `bash ~/clock/pi/install.sh`
 
 `deploy.cmd` copies the project over SSH; run it again after any change. `pi/install.sh` creates the
-Pi's virtual environment, installs the requirements, autostarts the clock full screen at login and
-turns off screen blanking. Tap the screen to change face; a keyboard's Esc quits to the desktop.
+Pi's virtual environment, installs the requirements, turns off screen blanking and runs
+`pi/autostart.sh`, which starts the clock now and at every boot. Tap the screen to change face; a
+keyboard's Esc quits.
+
+The clock runs as a systemd user service (`clock`) and draws straight to the screen (SDL's kmsdrm
+driver), so it needs no desktop and starts before anyone logs in; it is restarted if it crashes.
+If a desktop is installed it must not be running, as it would hold the screen: boot to the console
+(`sudo raspi-config` → System Options → Boot). Over SSH:
+
+    systemctl --user restart clock          restart it (pi/restart.sh does this)
+    systemctl --user stop clock             stop it until the next boot
+    systemctl --user disable clock          stop it starting at boot
+    journalctl _SYSTEMD_USER_UNIT=clock.service -b      its output since boot
 
 ## Chimes
 

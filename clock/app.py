@@ -55,6 +55,9 @@ def main(argv=None):
     args = parse_args(argv)
     if args.screenshot:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
+    elif args.fullscreen and sys.platform.startswith("linux") \
+            and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        os.environ.setdefault("SDL_VIDEODRIVER", "kmsdrm")   # no desktop: draw straight to the screen
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
     import pygame
