@@ -185,6 +185,19 @@ def main(argv=None):
             return state.fw - 1 - x, state.fh - 1 - y
         return x, y
 
+    def pointer(event):
+        """Screen position of a press or release, or None to ignore the event.
+
+        Touches are read as FINGER events: with no desktop (kmsdrm) SDL sends nothing else for them,
+        and under a desktop the mouse clicks it also makes from them are skipped so that one tap
+        isn't counted twice."""
+        if event.type in (pygame.FINGERDOWN, pygame.FINGERUP):
+            sw, sh = screen.get_size()
+            return event.x * sw, event.y * sh          # finger positions are 0..1 across the screen
+        if getattr(event, "touch", False):
+            return None
+        return event.pos
+
     def update_due(now):
         """New code is installed: restart during the dim hours, when nobody is looking."""
         if not UPDATE_FLAG.exists() or settings.visible:
@@ -209,11 +222,16 @@ def main(argv=None):
                     settings.open()
                 elif event.key == pygame.K_SPACE and not settings.visible:
                     next_face()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                press = (pygame.time.get_ticks(), to_canvas(event.pos))
-            elif event.type == pygame.MOUSEBUTTONUP and press is not None:
+            elif event.type in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
+                pos = pointer(event)
+                if pos is not None and press is None:
+                    press = (pygame.time.get_ticks(), to_canvas(pos), getattr(event, "finger_id", None))
+            elif event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP) and press is not None:
+                pos = pointer(event)
+                if pos is None or getattr(event, "finger_id", None) != press[2]:
+                    continue                                  # a second finger, or a duplicate
                 press = None
-                pos = to_canvas(event.pos)
+                pos = to_canvas(pos)
                 if settings.visible:
                     settings.tap(pos)
                 else:
